@@ -1,0 +1,39 @@
+#!/usr/bin/env groovy
+import groovy.json.JsonSlurper
+
+node {
+    git url: 'https://github.com/jfrogtraining/swampup2018', branch: 'beta'
+    def namespace_us = "${env.NAMESPACE_US_DOMAIN}"
+    def USSERVER_URL = "https://artifactory-${namespace_us}/artifactory"
+    def USEDGE_URL = "https://artifactory-edge1-${namespace_us}/artifactory"
+    def namespace_au =  "${env.NAMESPACE_AU_DOMAIN}"
+    def AUEDGE_URL = "https://artifactory-edge2-${namespace_au}/artifactory"
+    def AUSERVER_URL = "https://artifactory-${namespace_au}/artifactory"
+    def namespace_in = "${env.NAMESPACE_IN_DOMAIN}"
+    def INEDGE_URL = "https://artifactory-edge3-${namespace_in}/artifactory"
+
+    createRepo(USSERVER_URL, "devopsautomation/setup/betalocalrepo.yaml")
+    createRepo(USSERVER_URL, "devopsautomation/setup/betaremote.yaml")
+    createRepo(AUSERVER_URL, "devopsautomation/setup/betalocalrepo.yaml")
+    createRepo(AUSERVER_URL, "devopsautomation/setup/betaremote.yaml")
+
+    createRepo(USEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
+    createRepo(AUEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
+    createRepo(INEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
+    unblockDownload (USSERVER_URL)
+    unblockDownload (AUSERVER_URL)
+}
+
+def createRepo (artUrl, yamlFile) {
+    def curlString = "curl -uadmin:password ${artUrl}"
+    def createRepoCmd = curlString +  "/api/system/configuration -X PATCH -H 'Content-Type: application/yaml' -T ${yamlFile}"
+    sh createRepoCmd
+}
+
+def unblockDownload (artUrl) {
+    def curlString = "curl -uadmin:password ${artUrl}"
+    def createCmd = curlString +  "/api/xray/allowBlockedArtifactsDownload?allow=true -X POST"
+    sh createCmd
+    createCmd = curlString +  "/api/xray/allowDownloadWhenUnavailable?allow=true -X POST"
+    sh createCmd
+}
