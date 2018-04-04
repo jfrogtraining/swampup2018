@@ -1,0 +1,88 @@
+#!/usr/bin/env groovy
+import groovy.json.JsonSlurper
+
+node {
+
+    def DEPLOY_REPO = "gradle-release"
+    def CLEAN_REPO = "YES"
+    def WATCHNAME = env.JOB_NAME
+    def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${env.NAMESPACE_US_DOMAIN}"
+    def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
+    def XRAYURL = "https://xray-${namespace_domain}"
+    def server = Artifactory.newServer url: SERVER_URL, credentialsId: CREDENTIALS
+    def rtGradle = Artifactory.newGradleBuild()
+
+    //Clone example code from GitHub repository
+    stage 'Build'
+        git url: 'https://github.com/jfrogtraining/project-examples.git', branch: 'swampup2017'
+
+    stage 'Artifactory configuration'
+        currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
+        createXrayWatch (WATCHNAME, XRAYURL)
+        rtGradle.tool = GRADLE_TOOL // Tool name from Jenkins configuration
+        rtGradle.deployer repo:DEPLOY_REPO, server: server
+        rtGradle.resolver repo:'libs-release', server: server
+        rtGradle.deployer.addProperty("unit-test", "pass").addProperty("qa-team", "platform", "ui")
+        def buildInfo = Artifactory.newBuildInfo()
+        buildInfo.env.capture = true
+
+    //Run gradle build
+    stage 'Exec Gradle'
+        if(CLEAN_REPO == "YES") {
+            sh 'rm -rf ~/.gradle/caches'
+        }
+        rtGradle.run rootDir: "gradle-examples/4/gradle-example-ci-server/", buildFile: 'build.gradle', tasks: 'clean artifactoryPublish', buildInfo: buildInfo
+
+    //Publish artifacts to Artifactory along with build information and scan build artifacts in Xray
+    stage 'Publish Build Information & Scan Artifacts'
+        server.publishBuildInfo buildInfo
+        if (XRAY_SCAN == "YES") {
+            def scanConfig
+            if (FAIL_BUILD == 'false') {
+                scanConfig = [
+                    'buildName'      : env.JOB_NAME,
+                    'buildNumber'    : env.BUILD_NUMBER,
+                    'failBuild'      : false
+                ]
+            } else {
+            (FAIL_BUILD == 'false') {
+                scanConfig = [
+                 'buildName'      : env.JOB_NAME,
+                 'buildNumber'    : env.BUILD_NUMBER,
+                 'failBuild'      : true
+                ]}
+            }
+            def scanResult = server.xrayScan scanConfig
+            echo scanResult as String
+         }
+}
+
+// common code to be included in library
+def createXrayWatch (watch, XRAYURL) {
+    def watchConfig = """ {
+        "active"      : true,
+        "name"        : "${watch}",
+        "target_type" : "build",
+        "art_id"      : "artCi1",
+        "target_name" : "${watch}"
+    }"""
+
+    def createWatch = ["curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "${watchConfig}", "-u", "admin:password", "${XRAYURL}/api/v1/watches"]
+
+    def curlString = "curl -uadmin:password " + "-X GET " + XRAYURL
+    def getWatch = curlString +  "/api/v1/watches/${watch}"
+    try {
+        def getWatchResponse = getWatch.execute().text
+        def jsonSlurper = new JsonSlurper()
+        def watchexist = jsonSlurper.parseText("${getWatchResponse}")
+        if (watchexist.error) {
+            def createWatchResponse = createWatch.execute().text
+        }
+    } catch (Exception e) {
+              println "XRay cannot retrieve or create watch information ${e.message}"
+              ignoreAlertsCheck = true
+    }
+}
+
+
+
