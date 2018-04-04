@@ -2,7 +2,9 @@
 import groovy.json.JsonSlurper
 
 node {
-    git url: 'https://github.com/jfrogtraining/swampup2018', branch: 'beta'
+    git branch: 'beta',
+       credentialsId: '3eb629b4-ca19-465e-95dd-531402ee6c5f',
+       url: 'https://github.com/jfrogtraining/swampup2018'
     def namespace_us = "${env.NAMESPACE_US_DOMAIN}"
     def USSERVER_URL = "https://artifactory-${namespace_us}/artifactory"
     def USEDGE_URL = "https://artifactory-edge1-${namespace_us}/artifactory"
