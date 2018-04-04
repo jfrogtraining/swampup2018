@@ -6,7 +6,10 @@ node {
     def DEPLOY_REPO = "gradle-release"
     def CLEAN_REPO = "YES"
     def WATCHNAME = env.JOB_NAME
-    def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${env.NAMESPACE_US_DOMAIN}"
+    def jobName = env.JOB_NAME
+    def domainName = jobName.matches("(.*)-au") ? "${env.NAMESPACE_AU_DOMAIN}":"${env.NAMESPACE_US_DOMAIN}"
+    def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${domainName}"
+    println "name space is " + namespace_domain
     def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
     def XRAYURL = "https://xray-${namespace_domain}"
     def server = Artifactory.newServer url: SERVER_URL, credentialsId: CREDENTIALS
