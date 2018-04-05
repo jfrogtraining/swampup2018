@@ -24,6 +24,8 @@ node {
     createRepo(INEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
     unblockDownload (USSERVER_URL)
     unblockDownload (AUSERVER_URL)
+    downloadDependencies(USSERVER_URL)
+    downloadDependencies(AUSERVER_URL)
 }
 
 def createRepo (artUrl, yamlFile) {
@@ -38,4 +40,16 @@ def unblockDownload (artUrl) {
     sh createCmd
     createCmd = curlString +  "/api/xray/allowDownloadWhenUnavailable?allow=true -X POST"
     sh createCmd
+}
+
+// to do- change the password to use Jenkins credentials for artifactory.
+def downloadDependencies (serverurl) {
+    sh 'curl -fL jfrog https://getcli.jfrog.io | sh'
+    sh './jfrog rt c clear < /dev/null'
+    sh './jfrog rt c training --url https://jfrogtraining.jfrog.io/jfrogtraining --apikey AKCp2Vo711zssGkjSUgXYc32HVfNhUbddJ9uLGRhQDpDTWuKr7EFeZorbpbiFfBu2haZ81YLX < /dev/null'
+    sh './jfrog rt dl tomcat-local/org/apache/apache-tomcat/ ./ --server-id training'
+    sh './jfrog rt dl tomcat-local/java/ ./ --server-id training'
+    sh "./jfrog rt c beta --user admin --password password --url ${serverurl} < /dev/null"
+    sh './jfrog rt u java/ tomcat-local/ --server-id beta --flat false'
+    sh './jfrog rt u org/ tomcat-local/ --server-id beta --flat false'
 }
