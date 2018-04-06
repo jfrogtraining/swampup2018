@@ -55,4 +55,6 @@ def downloadDependencies (serverurl) {
     sh './jfrog rt u org/ tomcat-local/ --server-id beta --flat false'
     sh './jfrog rt u helm generic-local/helm --server-id beta --flat true'
     sh 'cp ./jfrog /usr/sbin/jfrog'
+    sh 'cp helm /usr/sbin/helm'
+    sh "chmod 777 /usr/sbin/helm"
 }
