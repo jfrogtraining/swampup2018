@@ -49,7 +49,9 @@ def downloadDependencies (serverurl) {
     sh './jfrog rt c training --url https://jfrogtraining.jfrog.io/jfrogtraining --apikey AKCp2Vo711zssGkjSUgXYc32HVfNhUbddJ9uLGRhQDpDTWuKr7EFeZorbpbiFfBu2haZ81YLX < /dev/null'
     sh './jfrog rt dl tomcat-local/org/apache/apache-tomcat/ ./ --server-id training'
     sh './jfrog rt dl tomcat-local/java/ ./ --server-id training'
+    sh './jfrog rt dl generic-local/helm ./ --server-id training'
     sh "./jfrog rt c beta --user admin --password password --url ${serverurl} < /dev/null"
     sh './jfrog rt u java/ tomcat-local/ --server-id beta --flat false'
     sh './jfrog rt u org/ tomcat-local/ --server-id beta --flat false'
+    sh './jfrog rt u helm generic-local/helm --server-id beta --flat true'
 }
