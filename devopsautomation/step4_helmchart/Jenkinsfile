@@ -40,7 +40,7 @@ def updateChartFile () {
 
 def getLatestDockerImage (server_url) {
 
-   def aqlString = 'items.find ({ "repo":"docker-prod-local","type":"folder","$and":[{"path":{"$match":"docker-app*"}},{"path":{"$nmatch":"docker-app/latest"}}]}).include("path","created","name").sort({"$desc" : ["created"]}).limit(1)
+   def aqlString = 'items.find ({ "repo":"docker-prod-local","type":"folder","$and":[{"path":{"$match":"docker-app*"}},{"path":{"$nmatch":"docker-app/latest"}}]}).include("path","created","name").sort({"$desc" : ["created"]}).limit(1)'
 
    File aqlFile = File.createTempFile("dockerlatest", ".tmp")
    aqlFile.deleteOnExit()
