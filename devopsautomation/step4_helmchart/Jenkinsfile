@@ -1,0 +1,61 @@
+#!/usr/bin/env groovy
+import groovy.json.JsonSlurper
+
+node {
+    def WATCHNAME = env.JOB_NAME
+    def jobName = env.JOB_NAME
+    def domainName = jobName.matches("(.*)-au") ? "${env.NAMESPACE_AU_DOMAIN}":"${env.NAMESPACE_US_DOMAIN}"
+    def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${domainName}"
+    println "Domain Used : " + namespace_domain
+
+    def server_url = "https://artifactory-${namespace_domain}/artifactory"
+    def image_tag = getLatestDockerImage(server_url)
+    def repo = "helm-virtual"
+    stage('Clone repository') {
+        /* Let's make sure we have the repository cloned to our workspace */
+        git url: 'https://github.com/jfrogtraining/kubernetes_example.git', branch: 'master'
+    }
+
+    stage('Build Chart & push it to Artifactory repo') {
+        /* Configure helm client to point to k8s cluster */
+         withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
+              sh "jfrog rt c beta --user ${USERNAME} --password ${PASSWORD} --url ${server_url} < /dev/null"
+         }
+
+         updateChartFile ()
+         sh "helm init"
+         sh "sed -i 's/latest/${image_tag}/g' docker-app-chart/values.yaml"
+         sh "helm package ./docker-app-chart/"
+         sh "jfrog rt u '*.${env.BUILD_NUMBER}.tgz' ${repo} --build-name=${env.JOB_NAME} --build-number=${env.BUILD_NUMBER} -server-id beta --props='release-bundle=true'"
+         sh "jfrog rt bce ${env.JOB_NAME} ${env.BUILD_NUMBER} "
+         sh "jfrog rt dl docker-prod-local/docker-app/${image_tag}/manifest.json --build-name=${env.JOB_NAME} --build-number=${env.BUILD_NUMBER} -server-id beta"
+         sh "jfrog rt bp ${env.JOB_NAME} ${env.BUILD_NUMBER} -server-id beta"
+    }
+}
+
+def updateChartFile () {
+    def BUILD_NUMBER = env.BUILD_NUMBER
+    sh 'sed -i "s/0.1.1/0.1.$BUILD_NUMBER/" ./docker-app-chart/Chart.yaml'
+}
+
+def getLatestDockerImage (server_url) {
+
+   def aqlString = 'items.find ({ "repo":"docker-prod-local","type":"folder","$and":[{"path":{"$match":"docker-app*"}},{"path":{"$nmatch":"docker-app/latest"}}]}).include("path","created","name").sort({"$desc" : ["created"]}).limit(1)
+
+   File aqlFile = File.createTempFile("dockerlatest", ".tmp")
+   aqlFile.deleteOnExit()
+
+   aqlFile << aqlString
+
+   def getLatestChart = "curl -uadmin:password -X POST " + server_url + "/api/search/aql -T " + aqlFile.getAbsolutePath()
+
+   try {
+         def helmchartinfo = getLatestChart.execute().text
+         def jsonSlurper = new JsonSlurper()
+         def latestChart = jsonSlurper.parseText("${helmchartinfo}")
+         return latestChart ? latestChart.results[0].name:"latest"
+      } catch (Exception e) {
+         println "Caught exception finding lastest docker-app helm chart. Message ${e.message}"
+         throw e
+      }
+}
