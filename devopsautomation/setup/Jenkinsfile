@@ -2,6 +2,10 @@
 import groovy.json.JsonSlurper
 
 node {
+    def jobList = ["step1-create-application-war-file","step2-create-docker-image-template","step3-create-docker-image-product","step4-create-helm-chart","step5-create-helm-release-bundle",
+                   "step1-create-application-war-file-au","step2-create-docker-image-template-au","step3-create-docker-image-product-au","maven-example","data-generator-debian",
+                   "data-generator-docker","data-generator-maven","	data-generator-rpm"]
+
     git branch: 'beta',
        credentialsId: '3eb629b4-ca19-465e-95dd-531402ee6c5f',
        url: 'https://github.com/jfrogtraining/swampup2018'
@@ -26,6 +30,10 @@ node {
     unblockDownload (AUSERVER_URL)
     downloadDependencies(USSERVER_URL)
     downloadDependencies(AUSERVER_URL)
+
+    jobList.each () {
+        setNewBuildNumber("${it}")
+    }
 }
 
 def createRepo (artUrl, yamlFile) {
@@ -57,4 +65,12 @@ def downloadDependencies (serverurl) {
     sh 'cp ./jfrog /usr/sbin/jfrog'
     sh 'cp helm /usr/sbin/helm'
     sh "chmod 777 /usr/sbin/helm"
+}
+
+def setNewBuildNumber (jobname) {
+    def testing = build job: "${jobname}"
+    def newBuildNumber = testing.getNumber() + 50
+    def job = Jenkins.instance.getItem("${jobname}")
+    job.nextBuildNumber = newBuildNumber
+    job.saveNextBuildNumber()
 }
