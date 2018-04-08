@@ -34,7 +34,7 @@ node {
     def PNUM = random.nextInt(10) + 1
     def NUMOFTAGS = 1
     def DNAME = "sample_docker"
-    def REPO = "docker-prod-local"
+    def REPO = "docker-stage-local"
     def ARTIUSER = "admin"
     def PASSWORD = "password"
     def baseImage = "busybox"
