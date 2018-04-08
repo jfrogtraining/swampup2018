@@ -46,7 +46,7 @@ node {
     def WATCHNAME = "docker-stage-local"
     def INUM = random.nextInt(1) + 1
     def LNUM = random.nextInt(10) + 1
-    def TAG = latest
+    def TAG = "latest"
     def DOCKER_REGISTRY = "docker-artifactory-${namespace_domain}"
     def DOCKERHOSTMAP = ""
     def XRAYPASSWORD = "password"
