@@ -47,7 +47,6 @@ node {
   stage ('Generating Debian Data') {
     createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
     currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
-    println "${WATCHNAME} has starting ${startCount} alerts"
     withCredentials([usernamePassword(credentialsId: SOLENGHA, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
        sh 'docker system prune -f'
        sh 'rm -rf /home/jenkins/jenkins_slave/tools/'
