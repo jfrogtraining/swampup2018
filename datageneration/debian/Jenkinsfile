@@ -43,7 +43,7 @@ node {
     def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
     def rtServer = Artifactory.newServer url: SERVER_URL, username: 'admin', password: 'password'
     def buildInfo = Artifactory.newBuildInfo()
-    def dockerURL = "docker-artifactory-${namespace_domain}
+    def dockerURL = "docker-artifactory-${namespace_domain}"
 
   stage ('Generating Debian Data') {
     createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
