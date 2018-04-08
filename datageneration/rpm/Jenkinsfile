@@ -1,0 +1,170 @@
+#!/usr/bin/env groovy
+import groovy.json.JsonSlurper
+import java.util.Random
+
+/ Parameters - the following parameters can be exposed using Jenkins Parameters.
+//    size - SIZE = <int>M/K ,Size of single package to generate(before comprassion). example:10M
+//    PNUM - PNUM = <int> ,Number of packges to generate
+//    DEST - DEST = <path> ,Destination path to generate the files
+//    FNUM - FNUM = <int>,Size of files in the lowset level
+//    COMPRESS - COMPRESS = 0-9,Compression level of the final packge (0-9)
+//    PROPS - PROPS = <debian property>,trusty/main/all
+//    REPO - REPO = <debian repository>,The repository to deploy debian packages
+//    ARTIUSER - ARTIUSER = <artifactory user>,Artifactory user
+//    DEPTH - DEPTH = <int>,Size of the final packge tree
+//    DPATH - DPATH = <path>,The path files will be deployed to
+//    TESTING - build label
+//    WATCHNAME - Xray watch name
+//    XRAYPASSWORD -
+//    ARTIURL - artifactory url
+//    XRAYURL - xray url
+
+node  {
+	def startCount
+	def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
+	Random random = new Random()
+
+	 def SIZE = (random.nextInt(40) + 1).toString() + "M"
+     def PNUM = random.nextInt(2) + 1
+     def DEST = ""
+     def FNUM = ""
+     def COMPRESS = ""
+     def PROPS = ""
+     def REPO = "rpm-dev-local"
+     def ARTIUSER = "admin"
+     def PASSWORD = "password"
+     def DEPTH = ""
+     def DPATH = "/${BUILD_NUMBER}/os/x86_64/RPMS/"
+     def TESTING = "beta"
+     def WATCHNAME = "rpm-dev-local"
+     def XRAYPASSWORD = "password"
+     def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${env.NAMESPACE_US_DOMAIN}"
+     def ARTIURL = "https://artifactory-${namespace_domain}/artifactory"
+     def XRAYURL = "https://xray-${namespace_domain}"
+     def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
+     def rtServer = Artifactory.newServer url: SERVER_URL, username: 'admin', password: 'password'
+     def buildInfo = Artifactory.newBuildInfo()
+
+
+	stage ('Generating Debian Data') {
+	startCount = getAlertCount(WATCHNAME, ignoreAlertsCheck,XRAYURL)
+        println "${WATCHNAME} has starting ${startCount} alerts"
+        createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
+		currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
+		withCredentials([usernamePassword(credentialsId: SOLENGHA, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
+           sh 'docker login -u ${repoUser} -p ${repoPwd} solengha-dockerv2.jfrog.io'
+		   sh 'docker pull solengha-dockerv2.jfrog.io/qa/data/rpm-generator:1.2'
+		   sh "docker run --name rpm-generator-$BUILD_NUMBER -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${SIZE} -e PNUM=${PNUM} -e FNUM=${FNUM} solengha-dockerv2.jfrog.io/qa/data/rpm-generator:1.2"
+		   sh 'docker logs -f rpm-generator-$BUILD_NUMBER'
+		}
+		rtServer.publishBuildInfo buildInfo
+	}
+
+	stage ('Check Last File') {
+		def server = Artifactory.newServer url: ARTIURL, username: ARTIUSER, password: PASSWORD
+		def path = get_path()
+		def fileName = get_file(PNUM)
+
+		def downloadSpec = """{
+			"files": [
+				{
+					"pattern":"$REPO/$path/$fileName",
+					"target": "$fileName",
+					"flat": "true"
+				}
+			]
+		}"""
+
+		for (i = 0; i < 60; i++) {
+			server.download (downloadSpec)
+			if (fileExists(fileName)) {
+				println "Waited $i seconds"
+				sh "rm ${fileName}"
+				currentBuild.result = 'SUCCESS'
+				return
+			} else {
+			    println "Seconds Elapsed: " + i
+				sleep(1)
+			}
+		}
+		println "Download $path/$fileName failed. "
+		currentBuild.result = 'UNSTABLE'
+		return
+	}
+
+	stage ('Check alert counts') {
+		if (ignoreAlertsCheck) return
+        sleep (180)
+        def endCount = getAlertCount(WATCHNAME, ignoreAlertsCheck, XRAYURL)
+        def expectCount = startCount + 1
+        if (expectCount.toInteger() > endCount.toInteger()) {
+            println "${WATCHNAME} alerts count: expecting ${expectCount}; found $endCount"
+            currentBuild.result = 'SUCCESS'
+        } else {
+			println "${WATCHNAME} has starting ${endCount} alerts"
+        }
+    }
+
+	stage ('Cleanup') {
+		sh 'docker rm -vf rpm-generator-$BUILD_NUMBER'
+	}
+}
+
+def get_file (PNUM) {
+	def ext = "rpm"
+	def nextNum = PNUM.toInteger() + 1
+	return ("sample_rpm${PNUM}_${BUILD_NUMBER}-${PNUM}-${nextNum}.x86_64.$ext")
+}
+
+def get_path () {
+	return ("${BUILD_NUMBER}/os/x86_64/RPMS")
+}
+
+def getAlertCount (watch, ignoreAlertsCheck, XRAYURL) {
+    if (ignoreAlertsCheck) return 0
+    def count = 0
+    def curlString = "curl -uadmin:password " + "-X GET " + XRAYURL
+    def getAlertCountStr = curlString +  "/api/v1/alerts?offset=0&order_by=created_at&limit=500&direction=asc&watch_name=${watch}"
+    println "Curl String is " + getAlertCountStr
+    try {
+    	def alerts = getAlertCountStr.execute().text
+    	def jsonSlurper = new JsonSlurper()
+    	def watchalert = jsonSlurper.parseText("${alerts}")
+    	watchalert.data.each {watchname ->
+            if (watchname.watch_name == watch) {
+                count++
+            }
+    	}
+    } catch (Exception e) {
+    	println "XRay not responding possibly due to lots of alerts. ${e.message}"
+    	ignoreAlertsCheck = true
+    }
+    return count
+}
+
+def createXrayWatch (watch, ignoreAlertsCheck, XRAYURL) {
+    def watchConfig = """ {
+        "active"      : true,
+        "name"        : "${watch}",
+        "target_type" : "repository",
+        "art_id"      : "artCi1",
+        "target_name" : "${watch}"
+    }"""
+
+    if (ignoreAlertsCheck) return 0
+    def createWatch = ["curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "${watchConfig}", "-u", "admin:password", "${XRAYURL}/api/v1/watches"]
+
+    def curlString = "curl -uadmin:password " + "-X GET " + XRAYURL
+    def getWatch = curlString +  "/api/v1/watches/${watch}"
+    try {
+        def getWatchResponse = getWatch.execute().text
+        def jsonSlurper = new JsonSlurper()
+        def watchexist = jsonSlurper.parseText("${getWatchResponse}")
+        if (watchexist.error) {
+            def createWatchResponse = createWatch.execute().text
+        }
+    } catch (Exception e) {
+              println "XRay cannot retrieve or create watch information ${e.message}"
+              ignoreAlertsCheck = true
+    }
+}
