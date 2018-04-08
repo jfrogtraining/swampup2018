@@ -20,7 +20,6 @@ import java.util.Random
 //    XRAYURL - xray url
 
 node {
-    def startCount
     def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
     Random random = new Random()
 
@@ -48,7 +47,6 @@ node {
   stage ('Generating Debian Data') {
     createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
     currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
-    startCount = getAlertCount(WATCHNAME, ignoreAlertsCheck, XRAYURL)
     println "${WATCHNAME} has starting ${startCount} alerts"
     withCredentials([usernamePassword(credentialsId: SOLENGHA, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
        sh 'docker system prune -f'
@@ -93,17 +91,6 @@ node {
     return
   }
 
-    stage ('Check alert counts') {
-      if (ignoreAlertsCheck) return
-      sleep (120)
-      def endCount = getAlertCount(WATCHNAME, ignoreAlertsCheck, XRAYURL)
-      def expectCount = startCount + PNUM.toInteger()
-      if (expectCount.toInteger() > endCount.toInteger()) {
-        println "${WATCHNAME} alerts count: expecting ${expectCount}; found $endCount"
-        currentBuild.result = 'SUCCESS'
-      }
-    }
-
   stage ('Cleanup') {
     sh 'docker rm -vf debian-generator-$BUILD_NUMBER'
   }
@@ -118,27 +105,6 @@ def get_path () {
   return ("build-$BUILD_NUMBER-debian")
 }
 
-def getAlertCount (watch, ignoreAlertsCheck, XRAYURL) {
-    if (ignoreAlertsCheck) return 0
-    def count = 0
-    def curlString = "curl -uadmin:password" + " -X GET " + XRAYURL
-    def getAlertCountStr = curlString +  "/api/v1/alerts?offset=0&order_by=created_at&limit=500&direction=asc&watch_name=${watch}"
-    println "Curl String is " + getAlertCountStr
-    try {
-      def alerts = getAlertCountStr.execute().text
-      def jsonSlurper = new JsonSlurper()
-      def watchalert = jsonSlurper.parseText("${alerts}")
-      watchalert.data.each {watchname ->
-          if (watchname.watch_name == watch) {
-              count++
-          }
-      }
-    } catch (Exception e) {
-      println "XRay not responding possibly due to lots of alerts. ${e.message}"
-      ignoreAlertsCheck = true
-    }
-    return count
-}
 
 def createXrayWatch (watch, ignoreAlertsCheck, XRAYURL) {
     def watchConfig = """ {
