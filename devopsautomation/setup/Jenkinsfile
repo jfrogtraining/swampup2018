@@ -17,6 +17,8 @@ node {
     def AUSERVER_URL = "https://artifactory-${namespace_au}/artifactory"
     def namespace_in = "${env.NAMESPACE_IN_DOMAIN}"
     def INEDGE_URL = "https://artifactory-edge3-${namespace_in}/artifactory"
+    def dockerUsURL = "docker-artifactory-${namespace_us}"
+    def dockerAuURL = "docker-artifactory-${namespace_au}"
 
     createRepo(USSERVER_URL, "devopsautomation/setup/betalocalrepo.yaml")
     createRepo(USSERVER_URL, "devopsautomation/setup/betaremote.yaml")
@@ -28,12 +30,12 @@ node {
     createRepo(INEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
     unblockDownload (USSERVER_URL)
     unblockDownload (AUSERVER_URL)
-    downloadDependencies(USSERVER_URL)
-    downloadDependencies(AUSERVER_URL)
+    downloadDependencies(USSERVER_URL, dockerUsURL, dockerAuURL)
+    downloadDependencies(AUSERVER_URL, dockerUsURL, dockerAuURL)
 
-    jobList.each () {
-        setNewBuildNumber("${it}")
-    }
+    //jobList.each () {
+    //   setNewBuildNumber("${it}")
+    //}
 }
 
 def createRepo (artUrl, yamlFile) {
@@ -51,14 +53,43 @@ def unblockDownload (artUrl) {
 }
 
 // to do- change the password to use Jenkins credentials for artifactory.
-def downloadDependencies (serverurl) {
+def downloadDependencies (serverurl, dockerUsURL, dockerAuURL) {
     sh 'curl -fL jfrog https://getcli.jfrog.io | sh'
     sh './jfrog rt c clear < /dev/null'
-    sh './jfrog rt c training --url https://jfrogtraining.jfrog.io/jfrogtraining --apikey AKCp2Vo711zssGkjSUgXYc32HVfNhUbddJ9uLGRhQDpDTWuKr7EFeZorbpbiFfBu2haZ81YLX < /dev/null'
+    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: ARTTRAINING, usernameVariable: 'TRAININGUSERNAME', passwordVariable: 'TRAININGPASSWORD']]) {
+        sh "./jfrog rt c training --url https://jfrogtraining.jfrog.io/jfrogtraining --user ${TRAININGUSERNAME} --password ${TRAININGPASSWORD} < /dev/null"
+        sh "docker login jfrogtraining-docker.jfrog.io -u ${TRAININGUSERNAME} -p ${TRAININGPASSWORD}"
+        sh 'docker pull jfrogtraining-docker.jfrog.io/qa/data/debian-generator:1.2'
+        sh 'docker pull jfrogtraining-docker.jfrog.io/qa/data/docker-generator:1.2'
+        sh 'docker pull jfrogtraining-docker.jfrog.io/qa/data/rpm-generator:1.2'
+        sh 'docker pull jfrogtraining-docker.jfrog.io/qa/data/maven-generator:1.5'
+    }
+
     sh './jfrog rt dl tomcat-local/org/apache/apache-tomcat/ ./ --server-id training'
     sh './jfrog rt dl tomcat-local/java/ ./ --server-id training'
     sh './jfrog rt dl generic-local/helm ./ --server-id training'
-    sh "./jfrog rt c beta --user admin --password password --url ${serverurl} < /dev/null"
+
+    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
+        sh "./jfrog rt c beta --user ${USERNAME} --password ${PASSWORD} --url ${serverurl} < /dev/null"
+
+        sh "docker tag jfrogtraining-docker.jfrog.io/qa/data/debian-generator:1.2 ${dockerUsURL}/qa/data/debian-generator:1.2"
+        sh "docker tag jfrogtraining-docker.jfrog.io/qa/data/docker-generator:1.2 ${dockerUsURL}/qa/data/docker-generator:1.2"
+        sh "docker tag jfrogtraining-docker.jfrog.io/qa/data/rpm-generator:1.2 ${dockerUsURL}/qa/data/rpm-generator:1.2"
+        sh "docker tag jfrogtraining-docker.jfrog.io/qa/data/maven-generator:1.5 ${dockerUsURL}/qa/data/maven-generator:1.5"
+        sh "docker push ${dockerUsURL}/qa/data/debian-generator:1.2"
+        sh "docker push ${dockerUsURL}/qa/data/docker-generator:1.2"
+        sh "docker push ${dockerUsURL}/qa/data/rpm-generator:1.2"
+        sh "docker push ${dockerUsURL}/qa/data/maven-generator:1.5"
+
+        sh "docker tag jfrogtraining-docker.jfrog.io/qa/data/debian-generator:1.2 ${dockerAuURL}/qa/data/debian-generator:1.2"
+        sh "docker tag jfrogtraining-docker.jfrog.io/qa/data/docker-generator:1.2 ${dockerAuURL}/qa/data/docker-generator:1.2"
+        sh "docker tag jfrogtraining-docker.jfrog.io/qa/data/rpm-generator:1.2 ${dockerAuURL}/qa/data/rpm-generator:1.2"
+        sh "docker tag jfrogtraining-docker.jfrog.io/qa/data/maven-generator:1.5 ${dockerAuURL}/qa/data/maven-generator:1.5"
+        sh "docker push ${dockerAuURL}/qa/data/debian-generator:1.2"
+        sh "docker push ${dockerAuURL}/qa/data/docker-generator:1.2"
+        sh "docker push ${dockerAuURL}/qa/data/rpm-generator:1.2"
+        sh "docker push ${dockerAuURL}/qa/data/maven-generator:1.5"
+    }
     sh './jfrog rt u java/ tomcat-local/ --server-id beta --flat false'
     sh './jfrog rt u org/ tomcat-local/ --server-id beta --flat false'
     sh './jfrog rt u helm generic-local/helm --server-id beta --flat true'
