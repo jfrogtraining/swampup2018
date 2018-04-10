@@ -43,14 +43,14 @@ node  {
      def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
      def rtServer = Artifactory.newServer url: SERVER_URL, username: 'admin', password: 'password'
      def buildInfo = Artifactory.newBuildInfo()
-
+     def dockerURL = "docker-artifactory-${namespace_domain}"
 
 	stage ('Generating Debian Data') {
         createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
 		currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
-		withCredentials([usernamePassword(credentialsId: SOLENGHA, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
-           sh 'docker login -u ${repoUser} -p ${repoPwd} solengha-dockerv2.jfrog.io'
-		   sh 'docker pull solengha-dockerv2.jfrog.io/qa/data/rpm-generator:1.2'
+		withCredentials([usernamePassword(credentialsId: CREDENTIALS, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
+		   sh "docker login -u ${repoUser} -p ${repoPwd} ${dockerURL}"
+		   sh "docker pull ${dockerURL}/qa/data/rpm-generator:1.2"
 		   sh "docker run --name rpm-generator-$BUILD_NUMBER -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${SIZE} -e PNUM=${PNUM} -e FNUM=${FNUM} solengha-dockerv2.jfrog.io/qa/data/rpm-generator:1.2"
 		   sh 'docker logs -f rpm-generator-$BUILD_NUMBER'
 		}
