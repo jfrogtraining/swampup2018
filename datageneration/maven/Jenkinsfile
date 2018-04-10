@@ -42,14 +42,15 @@ node {
     def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
     def rtServer = Artifactory.newServer url: SERVER_URL, username: 'admin', password: 'password'
     def buildInfo = Artifactory.newBuildInfo()
+    def dockerURL = "docker-artifactory-${namespace_domain}"
 
   stage ('Generating Maven Data') {
     createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
     currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
-    withCredentials([usernamePassword(credentialsId: SOLENGHA, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
-       // sh 'docker system prune -f'
-       sh 'docker login -u ${repoUser} -p ${repoPwd} solengha-dockerv2.jfrog.io'
-       sh 'docker pull solengha-dockerv2.jfrog.io/qa/data/maven-generator:1.5'
+    withCredentials([usernamePassword(credentialsId: CREDENTIALS, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
+       sh 'docker system prune -f'
+       sh "docker login -u ${repoUser} -p ${repoPwd} ${dockerURL}"
+       sh "docker pull ${dockerURL}/qa/data/maven-generator:1.5"
     }
     sh "docker run --name maven-generator-$BUILD_NUMBER --rm -e NUM_UNIQUE_FILE_PER_SIZE=${nooffiles} -e UNIQUE_FILE_SIZE=${filesize} -e UNIQUE_FILE_PREFIX=${prefix} -e POM_TEST_ARTIFACTORY_USER=${artifactory_user} -e POM_TEST_ARTIFACTORY_PASSWORD=${artifactory_password} -e group_id=${group_id} -e repository=${repository} -e artifactory_url=${artifactory_url} -e artifactory_user=${artifactory_user} -e artifactory_password=${artifactory_password} solengha-dockerv2.jfrog.io/qa/data/maven-generator:1.5 ${unique_packages} ${major_packages} ${minor_packages} ${type} ${num_of_snapshots} 3"
     rtServer.publishBuildInfo buildInfo
