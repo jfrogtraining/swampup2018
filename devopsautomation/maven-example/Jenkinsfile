@@ -1,0 +1,93 @@
+#!/usr/bin/env groovy
+import groovy.json.JsonSlurper
+
+node  {
+    def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${env.NAMESPACE_AU_DOMAIN}"
+    def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
+    def XRAYURL = "https://xray-${namespace_domain}"
+    def server = Artifactory.newServer url: SERVER_URL, credentialsId: CREDENTIALS
+    def rtMaven = Artifactory.newMavenBuild()
+    def WATCHNAME = "maven-example"
+    def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
+
+    stage 'Build'
+        git url: 'https://github.com/jfrogtraining/project-examples.git', branch: 'beta'
+
+    stage 'Artifactory configuration'
+        createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
+        rtMaven.tool = MAVEN_TOOL // Tool name from Jenkins configuration
+        rtMaven.deployer releaseRepo:'maven-release-local', snapshotRepo:'maven-snapshot-local', server: server
+        rtMaven.resolver releaseRepo:'libs-release', snapshotRepo:'libs-snapshot', server: server
+        rtMaven.deployer.addProperty("unit-test", "pass").addProperty("qa-team", "platform", "ui").addProperty("release-bundle", "true")
+        def buildInfo = Artifactory.newBuildInfo()
+        buildInfo.env.capture = true
+
+    stage 'Exec Maven'
+        rtMaven.run pom: 'maven-example/pom.xml', goals: 'clean install', buildInfo: buildInfo
+
+    stage 'Publish & Scan'
+        step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
+        if (reportOnTestsForBuild ()) {
+            currentBuild.result = 'UNSTABLE'
+        }
+        server.publishBuildInfo buildInfo
+        if (XRAY_SCAN == "YES") {
+             def scanConfig = [
+                'buildName'      : buildInfo.name,
+                'buildNumber'    : buildInfo.number,
+                'failBuild'      : false
+            ]
+            def scanResult = server.xrayScan scanConfig
+            echo scanResult as String
+        }
+}
+
+@NonCPS
+def reportOnTestsForBuild () {
+    def failedTests = []
+    def build = manager.build
+    if (build.getAction(hudson.tasks.junit.TestResultAction.class) == null) {
+        println "No Tests"
+        return true
+    }
+    def result = build.getAction(hudson.tasks.junit.TestResultAction.class).result
+    if ((result == null)) {
+        println "No test results"
+        return true
+    } else {
+        println "Failed test count: " + result.getFailCount()
+        println "Passed test count: " + result.getPassCount()
+        failedTests = result.getFailedTests()
+        failedTests.each { test ->
+            println test.name
+        }
+        return (result.getFailCount())
+    }
+}
+
+def createXrayWatch (watch, ignoreAlertsCheck, XRAYURL) {
+    def watchConfig = """ {
+        "active"      : true,
+        "name"        : "${watch}",
+        "target_type" : "build",
+        "art_id"      : "artCi1",
+        "target_name" : "${watch}"
+    }"""
+
+    if (ignoreAlertsCheck) return 0
+    def createWatch = ["curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "${watchConfig}", "-u", "admin:password", "${XRAYURL}/api/v1/watches"]
+
+    def curlString = "curl -uadmin:password " + "-X GET " + XRAYURL
+    def getWatch = curlString +  "/api/v1/watches/${watch}"
+    try {
+        def getWatchResponse = getWatch.execute().text
+        def jsonSlurper = new JsonSlurper()
+        def watchexist = jsonSlurper.parseText("${getWatchResponse}")
+        if (watchexist.error) {
+            def createWatchResponse = createWatch.execute().text
+        }
+    } catch (Exception e) {
+              println "XRay cannot retrieve or create watch information ${e.message}"
+              ignoreAlertsCheck = true
+    }
+}

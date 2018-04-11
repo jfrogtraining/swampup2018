@@ -1,0 +1,157 @@
+#!/usr/bin/env groovy
+import groovy.json.JsonSlurper
+import java.util.Random
+
+// Parameters - the following parameters can be exposed using Jenkins Parameters.
+//   baseIamge - The base image to build the images from. default: busybox
+//   SIZE = <int>M/K ,Size of single package to generate(before comprassion). default: (random.nextInt(100) + 1).toString() + "M"
+//   PNUM = <int> ,Number of packges to generate. default: random.nextInt(10) + 1
+//   NUMOFTAGS - The number of tags per image. default: 1
+//   DNAME = sample-docker - The docker image name. default: "sample_docker"
+//   NAMESPACE - jfrog - the namespace to push the docker image to. default: "beta"
+//   FNUM - Number of files in the lowset level (inside the package created in each layer). default: random.nextInt(10) + 1
+//   INUM - Number of images of to build". default: random.nextInt(1) + 1
+//   LNUM - Number of layers. default: random.nextInt(10) + 1
+//   TESTING - build label to use. default: "beta"
+//   WATCHNAME - Xray watch name. default: "docker-stage-local"
+//   TAG = 1 - The tag prefix to add to built images. default: 1
+//   NAMESPACEDOMAIN - <namespace>.<domain name>: default: solutions-us.jfrogbeta.com. The artifactory and XRAY url are derived from this - artifactory-solutions-us.jfrogbeta.com
+
+node {
+    def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
+    Random random = new Random()
+
+    def SIZE = (random.nextInt(100) + 1).toString() + "M"
+    def PNUM = random.nextInt(10) + 1
+    def NUMOFTAGS = 1
+    def DNAME = "sample_docker"
+    def REPO = "docker-stage-local"
+    def ARTIUSER = "admin"
+    def PASSWORD = "password"
+    def baseImage = "busybox"
+    def NAMESPACE = "beta"
+    def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${env.NAMESPACE_US_DOMAIN}"
+    def ARTIURL = "https://artifactory-${namespace_domain}/artifactory"
+    def XRAYURL = "https://xray-${namespace_domain}"
+    def TESTING = "beta"
+    def WATCHNAME = "docker-stage-local"
+    def INUM = random.nextInt(1) + 1
+    def LNUM = random.nextInt(10) + 1
+    def TAG = "latest"
+    def DOCKER_REGISTRY = "docker-artifactory-${namespace_domain}"
+    def DOCKERHOSTMAP = ""
+    def XRAYPASSWORD = "password"
+    def FNUM = random.nextInt(10) + 1
+    def TAGPREFIX = ""
+    def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
+    def rtServer = Artifactory.newServer url: SERVER_URL, username: 'admin', password: 'password'
+    def buildInfo = Artifactory.newBuildInfo()
+    def dockerURL = "docker-artifactory-${namespace_domain}"
+
+
+	stage ('Generating Docker Data') {
+	    createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
+		currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
+		git url: 'https://github.com/jfrogtraining/binary-content-generator.git', credentialsId: 'ce59f488-38bc-43ea-b280-468aa6366238'
+        sh 'chmod +x  buildSrc/src/main/resources/dind/list.sh'
+        sh 'baseImage=$(./buildSrc/src/main/resources/dind/list.sh)'
+        sh 'echo $baseImage'
+
+		withCredentials([usernamePassword(credentialsId: CREDENTIALS, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
+           sh 'docker system prune -f'
+           sh "docker login -u ${repoUser} -p ${repoPwd} ${dockerURL}"
+		   sh "docker pull ${dockerURL}/qa/data/docker-generator:1.2"
+		   sh "docker run --privileged --name docker-generator-$BUILD_NUMBER -e DOCKERHOSTMAP=${DOCKERHOSTMAP} -e NUMOFTAGS=${NUMOFTAGS} -e DOCKER_REGISTRY=${DOCKER_REGISTRY} -e DNAME=${DNAME} -e baseImage=${baseImage} -e LNUM=${LNUM} -e MODE=bp -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e NAMESPACE=${NAMESPACE} -e SIZE=${SIZE} -e INUM=${INUM} -e FNUM=${FNUM} -e TAG=${TAGPREFIX} solengha-dockerv2.jfrog.io/qa/data/docker-generator:1.2"
+		   sh 'docker logs -f docker-generator-$BUILD_NUMBER'
+		}
+	    rtServer.publishBuildInfo buildInfo
+	}
+
+	stage ('Check Last File') {
+		def server = Artifactory.newServer url: ARTIURL, username: ARTIUSER, password: PASSWORD
+		def path = get_path(NAMESPACE, INUM)
+		def fileName = get_file()
+
+		def downloadSpec = """{
+			"files": [
+				{
+					"pattern":"$REPO/$path/$fileName",
+					"target": "$fileName",
+					"flat": "true"
+				}
+			]
+		}"""
+
+		for (i = 0; i < 60; i++) {
+			server.download (downloadSpec)
+			if (fileExists(fileName)) {
+				println "Waited $i seconds"
+				sh "rm ${fileName}"
+				currentBuild.result = 'SUCCESS'
+				return
+			} else {
+			    println "Seconds Elapsed: " + i
+				sleep(1)
+			}
+		}
+		println "Download $path/$fileName failed. "
+		currentBuild.result = 'UNSTABLE'
+		return
+	}
+
+	stage ('Cleanup') {
+		sh 'docker rm -vf docker-generator-$BUILD_NUMBER'
+	}
+}
+
+def get_file () {
+	def ext = "json"
+	return ("manifest.$ext")
+}
+
+def get_path (NAMESPACE, INUM) {
+	return ("${NAMESPACE}/sample_docker${INUM}-${BUILD_NUMBER}/1.0")
+}
+
+def updateHostFile() {
+  sh "cat /etc/hosts"
+  URL netUrl = new URL(SERVER_URL)
+  def domainName = netUrl.getHost()
+  def query = "dig +short ${domainName}"
+  def ipList = sh (script: query, returnStdout: true)
+  List ips = ipList.split ('\n')
+  def dockerIpHost = ips[0] + " " + DOCKERHOSTMAP
+  println "IP Address for HOST is " + dockerIpHost
+  sh "set +e"
+  sh "sudo -- sh -c 'sed -i /${DOCKERHOSTMAP}/d /etc/hosts'"
+  sh "set -e"
+  sh "sudo -- sh -c 'echo ${dockerIpHost} >> /etc/hosts'"
+  sh "cat /etc/hosts"
+}
+
+def createXrayWatch (watch, ignoreAlertsCheck, XRAYURL) {
+    def watchConfig = """ {
+        "active"      : true,
+        "name"        : "${watch}",
+        "target_type" : "repository",
+        "art_id"      : "artCi1",
+        "target_name" : "${watch}"
+    }"""
+
+    if (ignoreAlertsCheck) return 0
+    def createWatch = ["curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "${watchConfig}", "-u", "admin:password", "${XRAYURL}/api/v1/watches"]
+
+    def curlString = "curl -uadmin:password " + "-X GET " + XRAYURL
+    def getWatch = curlString +  "/api/v1/watches/${watch}"
+    try {
+        def getWatchResponse = getWatch.execute().text
+        def jsonSlurper = new JsonSlurper()
+        def watchexist = jsonSlurper.parseText("${getWatchResponse}")
+        if (watchexist.error) {
+            def createWatchResponse = createWatch.execute().text
+        }
+    } catch (Exception e) {
+              println "XRay cannot retrieve or create watch information ${e.message}"
+              ignoreAlertsCheck = true
+    }
+}

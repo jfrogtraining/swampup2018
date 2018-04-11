@@ -1,0 +1,129 @@
+#!/usr/bin/env groovy
+import groovy.json.JsonSlurper
+import java.util.Random
+
+// Parameters - the following parameters can be exposed using Jenkins Parameters.
+//   unique_packages  - Number of Maven packages to build. default: unique_packages = random.nextInt(2) + 1
+//   major_packages   - Number of major packages. default: random.nextInt(2) + 1
+//   minor_packages   - Number of minor packages within major packages. default: random.nextInt(2) +1
+//   nooffiles        - Number of random files to include in the Maven package.  The FILESIZE parameter specifies the size of each of these files. default: random.nextInt(2) + 1
+//   filesize         - Size of each file in Megabytes. default: (random.nextInt(2) + 1).toString() + "M"
+//   prefix           - Prefix of the file name to use for the random files. default: "beta"
+//   repository       - Repository to deploy artifacts. default: "maven-data-local"
+//   type             - type of artifacts {release | snapshot | plugin-release | plugin-snapshot}. default" "release"
+//   group_id         - Maven GAVC. default: "org.pom.test.${BUILD_NUMBER}"
+//   watchname        - XRAY watch name to monitor the artifacts. Must be the same as repository. default: "maven-data-local"
+//   num_of_snapshots - number of snapshot builds. default: 0
+//   NAMESPACEDOMAIN - <namespace>.<domain name>: default: solutions-us.jfrogbeta.com. The artifactory and XRAY url are derived from this - artifactory-solutions-us.jfrogbeta.com
+
+node {
+    def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
+    Random random = new Random()
+
+    def unique_packages = random.nextInt(2) + 1    // number of packages
+    def major_packages = random.nextInt(2) + 1     // number of major versions
+    def minor_packages = random.nextInt(2) +1
+    def nooffiles = random.nextInt(2) + 1
+    def filesize = (random.nextInt(2) + 1).toString() + "M"
+    def prefix = "beta"
+    def repository = "maven-data-local"
+    def artifactory_user = "admin"
+    def artifactory_password = "password"
+    def type = "release"
+    def group_id = "org.pom.test.${BUILD_NUMBER}"
+    def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${env.NAMESPACE_US_DOMAIN}"
+    def artifactory_url = "https://artifactory-${namespace_domain}/artifactory"
+    def XRAYURL = "https://xray-${namespace_domain}"
+    def TESTING = "beta"
+    def WATCHNAME = "maven-data-local"
+    def num_of_snapshots = 0
+    def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
+    def rtServer = Artifactory.newServer url: SERVER_URL, username: 'admin', password: 'password'
+    def buildInfo = Artifactory.newBuildInfo()
+    def dockerURL = "docker-artifactory-${namespace_domain}"
+
+  stage ('Generating Maven Data') {
+    createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
+    currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
+    withCredentials([usernamePassword(credentialsId: CREDENTIALS, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
+       sh 'docker system prune -f'
+       sh "docker login -u ${repoUser} -p ${repoPwd} ${dockerURL}"
+       sh "docker pull ${dockerURL}/qa/data/maven-generator:1.5"
+    }
+    sh "docker run --name maven-generator-$BUILD_NUMBER --rm -e NUM_UNIQUE_FILE_PER_SIZE=${nooffiles} -e UNIQUE_FILE_SIZE=${filesize} -e UNIQUE_FILE_PREFIX=${prefix} -e POM_TEST_ARTIFACTORY_USER=${artifactory_user} -e POM_TEST_ARTIFACTORY_PASSWORD=${artifactory_password} -e group_id=${group_id} -e repository=${repository} -e artifactory_url=${artifactory_url} -e artifactory_user=${artifactory_user} -e artifactory_password=${artifactory_password} solengha-dockerv2.jfrog.io/qa/data/maven-generator:1.5 ${unique_packages} ${major_packages} ${minor_packages} ${type} ${num_of_snapshots} 3"
+    rtServer.publishBuildInfo buildInfo
+
+  }
+
+  stage ('Check Last File') {
+      println "done with data generation - checking for availability of the last file"
+    def server = Artifactory.newServer url: artifactory_url, username: artifactory_user, password: artifactory_password
+    def path = get_path(unique_packages, major_packages,minor_packages)
+    def fileName = get_file(unique_packages, major_packages,minor_packages)
+
+    def downloadSpec = """{
+      "files": [
+        {
+          "pattern":"${repository}/$path/$fileName",
+          "target": "$fileName",
+          "flat": "true"
+        }
+      ]
+    }"""
+        println "Entering loop"
+    for (i = 0; i < 60; i++) {
+      server.download (downloadSpec)
+      println "Try Downloading file "
+      if (fileExists(fileName)) {
+        println "Waited $i seconds"
+        sh "rm ${fileName}"
+        currentBuild.result = 'SUCCESS'
+        return
+      } else {
+          println "Seconds Elapsed: " + i
+        sleep(1)
+      }
+    }
+    println "Download $path/$fileName failed. "
+    currentBuild.result = 'UNSTABLE'
+    return
+  }
+}
+
+def get_file (unique_packages,major_packages,minor_packages ) {
+  def ext = "pom"
+  def packageCount = unique_packages.toInteger()
+  return ("multi$packageCount-$major_packages.$minor_packages.$ext")
+}
+
+def get_path (unique_packages, major_packages,minor_packages ) {
+    def packageCount = unique_packages.toInteger()
+  return ("org/pom/test/$BUILD_NUMBER/multi$packageCount/$major_packages.$minor_packages")
+}
+
+def createXrayWatch (watch, ignoreAlertsCheck, XRAYURL) {
+    def watchConfig = """ {
+        "active"      : true,
+        "name"        : "${watch}",
+        "target_type" : "repository",
+        "art_id"      : "artCi1",
+        "target_name" : "${watch}"
+    }"""
+
+    if (ignoreAlertsCheck) return 0
+    def createWatch = ["curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "${watchConfig}", "-u", "admin:password", "${XRAYURL}/api/v1/watches"]
+
+    def curlString = "curl -uadmin:password " + "-X GET " + XRAYURL
+    def getWatch = curlString +  "/api/v1/watches/${watch}"
+    try {
+        def getWatchResponse = getWatch.execute().text
+        def jsonSlurper = new JsonSlurper()
+        def watchexist = jsonSlurper.parseText("${getWatchResponse}")
+        if (watchexist.error) {
+            def createWatchResponse = createWatch.execute().text
+        }
+    } catch (Exception e) {
+              println "XRay cannot retrieve or create watch information ${e.message}"
+              ignoreAlertsCheck = true
+    }
+}
