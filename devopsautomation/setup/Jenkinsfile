@@ -33,9 +33,9 @@ node {
     downloadDependencies(USSERVER_URL, dockerUsURL, dockerAuURL)
     downloadDependencies(AUSERVER_URL, dockerUsURL, dockerAuURL)
 
-    //jobList.each () {
-      //setNewBuildNumber("${it}")
-    //}
+    jobList.each () {
+      setNewBuildNumber("${it}")
+    }
 }
 
 def createRepo (artUrl, yamlFile) {
