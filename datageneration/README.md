@@ -24,7 +24,7 @@
 * TESTING - build label to use. default: "beta"
 * WATCHNAME - Xray watch name. default: "docker-stage-local"
 * TAG = 1 - The tag prefix to add to built images. default: 1
-* NAMESPACEDOMAIN - <namespace>.<domain name>: default: solutions-us.jfrogbeta.com. The artifactory and XRAY url are derived from this - artifactory-solutions-us.jfrogbeta.com
+* NAMESPACEDOMAIN - namespace.domain name: default: solutions-us.jfrogbeta.com. The artifactory and XRAY url are derived from this - artifactory-solutions-us.jfrogbeta.com
 
 
 ###_Debian Data Generator_
@@ -41,8 +41,7 @@
 * DPATH = <path>,The path files will be deployed to. default: "build-${BUILD_NUMBER}-debian"
 * TESTING - build label to use. default: "beta"
 * WATCHNAME - Xray watch name. default: "debian-dev-local (must match REPO)
-* NAMESPACEDOMAIN - <namespace>.<domain name>: default: solutions-us.jfrogbeta.com. The artifactory and XRAY url are derived from this - artifactory-solutions-us.jfrogbeta.com
-
+* NAMESPACEDOMAIN - namespace.domain name: default: solutions-us.jfrogbeta.com. The artifactory and XRAY url are derived from this - artifactory-solutions-us.jfrogbeta.com
 
 ###Maven Data Generator
 ####Default settings (recommend to set your own)
@@ -57,4 +56,4 @@
 * group_id         - Maven GAVC. default: "org.pom.test.${BUILD_NUMBER}"
 * watchname        - XRAY watch name to monitor the artifacts. Must be the same as repository. default: "maven-data-local"
 * num_of_snapshots - number of snapshot builds. default: 0
-* NAMESPACEDOMAIN - <namespace>.<domain name>: default: solutions-us.jfrogbeta.com. The artifactory and XRAY url are derived from this - artifactory-solutions-us.jfrogbeta.com
+* NAMESPACEDOMAIN - namespace.domain name: default: solutions-us.jfrogbeta.com. The artifactory and XRAY url are derived from this - artifactory-solutions-us.jfrogbeta.com
