@@ -3,28 +3,19 @@ import groovy.json.JsonSlurper
 import java.util.Random
 
 // Parameters - the following parameters can be exposed using Jenkins Parameters.
-//    size - SIZE = <int>M/K ,Size of single package to generate(before comprassion). example:10M
-//    PNUM - PNUM = <int> ,Number of packges to generate
-//    DEST - DEST = <path> ,Destination path to generate the files
-//    FNUM - FNUM = <int>,Size of files in the lowset level
-//    COMPRESS - COMPRESS = 0-9,Compression level of the final packge (0-9)
-//    PROPS - PROPS = <debian property>,trusty/main/all
-//    REPO - REPO = <debian repository>,The repository to deploy debian packages
-//    ARTIUSER - ARTIUSER = <artifactory user>,Artifactory user
-//    DEPTH - DEPTH = <int>,Size of the final packge tree
-//    DPATH - DPATH = <path>,The path files will be deployed to
-//    TESTING - build label
-//    WATCHNAME - Xray watch name
-//    XRAYPASSWORD -
-//    ARTIURL - artifactory url
-//    XRAYURL - xray url
-//    NAMESPACE - docker push  dockerhub.jfrog.info/[NAMESPACE]/qa/data/docker-generator:1.1
-//    INUM - Number of docker images will be built
-//    LNUM - LNUM = Number of layers to add the baseImage
-//    TAG -  the tag images will be pushed with
-//    DOCKER_REGISTRY - docker url
-//    DOCKERHOSTMAP - hostname used for /etc/hosts in the case of self signed certificate for docker.  i.e. "docker.artifactory docker-virtual.artifactory"
-//                  - Leave empty if using signed certificate.
+//   baseIamge - The base image to build the images from. default: busybox
+//   SIZE = <int>M/K ,Size of single package to generate(before comprassion). default: (random.nextInt(100) + 1).toString() + "M"
+//   PNUM = <int> ,Number of packges to generate. default: random.nextInt(10) + 1
+//   NUMOFTAGS - The number of tags per image. default: 1
+//   DNAME = sample-docker - The docker image name. default: "sample_docker"
+//   NAMESPACE - jfrog - the namespace to push the docker image to. default: "beta"
+//   FNUM - Number of files in the lowset level (inside the package created in each layer). default: random.nextInt(10) + 1
+//   INUM - Number of images of to build". default: random.nextInt(1) + 1
+//   LNUM - Number of layers. default: random.nextInt(10) + 1
+//   TESTING - build label to use. default: "beta"
+//   WATCHNAME - Xray watch name. default: "docker-stage-local"
+//   TAG = 1 - The tag prefix to add to built images. default: 1
+//   NAMESPACEDOMAIN - <namespace>.<domain name>: default: solutions-us.jfrogbeta.com. The artifactory and XRAY url are derived from this - artifactory-solutions-us.jfrogbeta.com
 
 node {
     def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
