@@ -51,7 +51,7 @@ node  {
 		withCredentials([usernamePassword(credentialsId: CREDENTIALS, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
 		   sh "docker login -u ${repoUser} -p ${repoPwd} ${dockerURL}"
 		   sh "docker pull ${dockerURL}/qa/data/rpm-generator:1.2"
-		   sh "docker run --name rpm-generator-$BUILD_NUMBER -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${SIZE} -e PNUM=${PNUM} -e FNUM=${FNUM} solengha-dockerv2.jfrog.io/qa/data/rpm-generator:1.2"
+		   sh "docker run --name rpm-generator-$BUILD_NUMBER -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${SIZE} -e PNUM=${PNUM} -e FNUM=${FNUM} ${dockerURL}/qa/data/rpm-generator:1.2"
 		   sh 'docker logs -f rpm-generator-$BUILD_NUMBER'
 		}
 		rtServer.publishBuildInfo buildInfo
