@@ -44,4 +44,14 @@ virtualRepositories:
         - helm-remote
       description: "helm virtual"
       defaultDeploymentRepo: helm-local
-
+  docker:
+      type: docker
+      repositories:
+        - docker-local
+        - docker-remote
+        - docker-dev-local
+        - docker-prod-local
+        - docker-stage-local
+        - wine-as-service-docker-local
+      description: "docker virtual"
+      defaultDeploymentRepo: docker-stage-local
