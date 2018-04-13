@@ -123,6 +123,7 @@ node {
     
     //Promote image from local staging repositoy to production repository 
     stage ('Promote') {
+
         dir ('automation/docker-framework') {
             def promotionConfig = [
               'buildName'          : env.JOB_NAME,
@@ -135,7 +136,9 @@ node {
               'copy'               : true,
               'failFast'           : true
             ]
-            rtServer.promote promotionConfig
+            promoteBuild (SOURCE_REPO, PROMOTE_REPO, SERVER_URL)
+            // rtServer.promote promotionConfig - occassionally will hang on dry run
+
             reTagLatest (SOURCE_REPO, PROMOTE_REPO, SOURCE_REPO, SERVER_URL)
             reTagLatest (PROMOTE_REPO, PROMOTE_REPO, SOURCE_REPO, SERVER_URL)
          }
@@ -228,3 +231,32 @@ def createXrayWatch (watch, XRAYURL) {
               ignoreAlertsCheck = true
     }
 }
+
+def promoteBuild (source_repo, promote_repo, SERVER_URL) {
+
+    def buildPromotion = """ {
+        "status"      : "Released",
+        "comment"     : "Framework test with latest version of application",
+        "ciUser"      : "jenkins",
+        "sourceRepo"  : "${source_repo}",
+        "targetRepo"  : "${promote_repo}",
+        "copy"        : true,
+        "dependencies" : false,
+        "failFast": true
+    }"""
+
+    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
+        def createPromo = ["curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "${buildPromotion }", "-u", "${env.USERNAME}:${env.PASSWORD}", "${SERVER_URL}/api/build/promote/${env.JOB_NAME}/${env.BUILD_NUMBER}"]
+        try {
+           def getPromoResponse = createPromo.execute().text
+           def jsonSlurper = new JsonSlurper()
+           def promoStatus = jsonSlurper.parseText("${getPromoResponse}")
+           if (promoStatus.error) {
+               println "Promotion failed: " + promoStatus
+           }
+        } catch (Exception e) {
+           println "Promotion failed: ${e.message}"
+        }
+    }
+}
+

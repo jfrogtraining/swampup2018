@@ -61,7 +61,7 @@ node {
            sh 'docker system prune -f'
            sh "docker login -u ${repoUser} -p ${repoPwd} ${dockerURL}"
 		   sh "docker pull ${dockerURL}/qa/data/docker-generator:1.2"
-		   sh "docker run --privileged --name docker-generator-$BUILD_NUMBER -e DOCKERHOSTMAP=${DOCKERHOSTMAP} -e NUMOFTAGS=${NUMOFTAGS} -e DOCKER_REGISTRY=${DOCKER_REGISTRY} -e DNAME=${DNAME} -e baseImage=${baseImage} -e LNUM=${LNUM} -e MODE=bp -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e NAMESPACE=${NAMESPACE} -e SIZE=${SIZE} -e INUM=${INUM} -e FNUM=${FNUM} -e TAG=${TAGPREFIX} solengha-dockerv2.jfrog.io/qa/data/docker-generator:1.2"
+		   sh "docker run --privileged --name docker-generator-$BUILD_NUMBER -e DOCKERHOSTMAP=${DOCKERHOSTMAP} -e NUMOFTAGS=${NUMOFTAGS} -e DOCKER_REGISTRY=${DOCKER_REGISTRY} -e DNAME=${DNAME} -e baseImage=${baseImage} -e LNUM=${LNUM} -e MODE=bp -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e NAMESPACE=${NAMESPACE} -e SIZE=${SIZE} -e INUM=${INUM} -e FNUM=${FNUM} -e TAG=${TAGPREFIX} ${dockerURL}/qa/data/docker-generator:1.2"
 		   sh 'docker logs -f docker-generator-$BUILD_NUMBER'
 		}
 	    rtServer.publishBuildInfo buildInfo
