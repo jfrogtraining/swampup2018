@@ -136,7 +136,7 @@ node {
               'copy'               : true,
               'failFast'           : true
             ]
-            promoteBuild (SOURCE_REPO, PROMOTE_REPO, SERVER_URL)
+            promoteBuild2 (SOURCE_REPO, PROMOTE_REPO, SERVER_URL)
             // rtServer.promote promotionConfig - occassionally will hang on dry run
 
             reTagLatest (SOURCE_REPO, PROMOTE_REPO, SOURCE_REPO, SERVER_URL)
@@ -260,3 +260,43 @@ def promoteBuild (source_repo, promote_repo, SERVER_URL) {
     }
 }
 
+def promoteBuild2 (source_repo, promote_repo, ARTIFACTORY_URL) {
+
+    def buildPromotion = """ {
+        "status"      : "Released",
+        "comment"     : "Framework test with latest version of application",
+        "ciUser"      : "jenkins",
+        "sourceRepo"  : "${source_repo}",
+        "targetRepo"  : "${promote_repo}",
+        "copy"        : true,
+        "dependencies" : false,
+        "failFast": true
+    }"""
+
+    def post = new URL(ARTIFACTORY_URL + "/api/build/promote/" + env.JOB_NAME + "/" + env.BUILD_NUMBER).openConnection()
+    def message = buildPromotion
+    post.setRequestMethod("POST")
+    post.setDoOutput(true)
+    post.setRequestProperty("Content-Type", "application/json")
+    post.setRequestProperty("Authorization", "Basic YWRtaW46cGFzc3dvcmQ=")
+    post.getOutputStream().write(message.getBytes("UTF-8"))
+    def postRC = post.getResponseCode()
+    println(postRC)
+    if(postRC.equals(200)) {
+        println(post.getInputStream().getText())
+    }
+
+    // sh "curl -XPOST -H 'Content-Type: application/json' -d ${buildPromotion} -u admin:password ${ARTIFACTORY_URL}/api/build/promote/${env.JOB_NAME}/${env.BUILD_NUMBER}"
+    // def createPromo = ["curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "${buildPromotion}", "-u", "admin:password", "${ARTIFACTORY_URL}/api/build/promote/${env.JOB_NAME}/${env.BUILD_NUMBER}"]
+    // try {
+    //     def getPromoResponse = createPromo.execute().text
+    //     def jsonSlurper = new JsonSlurper()
+    //     def promoStatus = jsonSlurper.parseText("${getPromoResponse}")
+    //     if (promoStatus.error) {
+    //         println "Promotion failed!"
+    //         println "Reason: " + promoStatus
+    //     }
+    // } catch (Exception e) {
+    //     println "Promotion failed: ${e.message}"
+    // }
+}
