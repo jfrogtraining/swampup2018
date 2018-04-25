@@ -6,7 +6,7 @@ node {
                    "maven-example","data-generator-debian","data-generator-docker","data-generator-maven","data-generator-rpm","maven-release-bundle"]
 
     git branch: 'xray-debug',
-       credentialsId: '3eb629b4-ca19-465e-95dd-531402ee6c5f',
+       credentialsId: 'gitreader',
        url: 'https://github.com/jfrogtraining/swampup2018'
     def namespace_us = "10.70.30.5"
     def USSERVER_URL = "http://10.70.30.5/artifactory"
