@@ -21,7 +21,7 @@ node {
 
     stage 'Artifactory configuration'
         currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
-        createXrayWatch (WATCHNAME, XRAYURL)
+       // createXrayWatch (WATCHNAME, XRAYURL)
         rtGradle.tool = GRADLE_TOOL // Tool name from Jenkins configuration
         rtGradle.deployer repo:DEPLOY_REPO, server: server
         rtGradle.resolver repo:'libs-release', server: server
