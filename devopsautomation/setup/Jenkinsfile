@@ -16,7 +16,7 @@ node {
     def AUSERVER_URL = "https://artifactory-${namespace_au}/artifactory"
     def namespace_in = "${env.NAMESPACE_IN_DOMAIN}"
     def INEDGE_URL = "https://artifactory-edge3-${namespace_in}/artifactory"
-    def dockerUsURL = "docker-artifactory-${namespace_us}"
+    def dockerUsURL = "docker.artifactory"
     def dockerAuURL = "docker-artifactory-${namespace_au}"
 
     createRepo(USSERVER_URL, "devopsautomation/setup/betalocalrepo.yaml")
@@ -57,7 +57,7 @@ def downloadDependencies (serverurl, dockerUsURL, dockerAuURL) {
     sh './jfrog rt c clear < /dev/null'
     withCredentials([usernamePassword(credentialsId: 'jfrogtraining', passwordVariable: 'TRAININGPASSWORD', usernameVariable: 'TRAININGUSERNAME'), usernamePassword(credentialsId: 'DOCKER-REGISTRY', passwordVariable: 'DOCKERPASSSWORD', usernameVariable: 'DOCKERUSERNAME')])  {
         sh "./jfrog rt c training --url https://jfrogtraining.jfrog.io/jfrogtraining --user ${TRAININGUSERNAME} --password ${TRAININGPASSWORD} < /dev/null"
-        sh "docker login jfrogtraining-docker.jfrog.io -u ${DOCKERUSERNAME} -p ${DOCKERPASSSWORD}"
+        sh "docker login docker.jfrog.io -u ${DOCKERUSERNAME} -p ${DOCKERPASSSWORD}"
         sh 'docker pull docker.jfrog.io/qa/data/debian-generator:1.2'
         sh 'docker pull docker.jfrog.io/qa/data/docker-generator:1.2'
         sh 'docker pull docker.jfrog.io/qa/data/rpm-generator:1.2'
