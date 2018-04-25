@@ -60,7 +60,7 @@ def downloadDependencies (serverurl, dockerUsURL, dockerAuURL) {
         sh "docker login docker.jfrog.io -u ${DOCKERUSERNAME} -p ${DOCKERPASSSWORD}"
         sh 'docker pull docker.jfrog.io/qa/data/debian-generator:1.2'
         sh 'docker pull docker.jfrog.io/qa/data/docker-generator:1.2'
-        sh 'docker pull docker.jfrog.io/qa/data/rpm-generator:1.2'
+        sh 'docker pull docker.jfrog.io/qa/data/rpm-generator:1.1'
         sh 'docker pull docker.jfrog.io/qa/data/maven-generator:1.5'
     }
 
@@ -71,10 +71,10 @@ def downloadDependencies (serverurl, dockerUsURL, dockerAuURL) {
    withCredentials([usernamePassword(credentialsId: 'jfrogtraining', passwordVariable: 'TRAININGPASSWORD', usernameVariable: 'TRAININGUSERNAME'), usernamePassword(credentialsId: 'DOCKER-REGISTRY', passwordVariable: 'DOCKERPASSSWORD', usernameVariable: 'DOCKERUSERNAME')])  {
         sh "./jfrog rt c beta --user ${USERNAME} --password ${PASSWORD} --url ${serverurl} < /dev/null"
         sh "docker login ${dockerUsURL} -u ${DOCKERUSERNAME} -p ${DOCKERPASSSWORD}"
-        sh "docker tag docker.jfrog.io/qa/data/debian-generator:1.2 ${dockerUsURL}/qa/data/debian-generator:1.2"
+        sh "docker tag docker.jfrog.io/qa/data/debian-generator:1.1 ${dockerUsURL}/qa/data/debian-generator:1.2"
         sh "docker tag docker.jfrog.io/qa/data/docker-generator:1.2 ${dockerUsURL}/qa/data/docker-generator:1.2"
         sh "docker tag docker.jfrog.io/qa/data/rpm-generator:1.2 ${dockerUsURL}/qa/data/rpm-generator:1.2"
-        sh "docker tag docker.jfrog.io/qa/data/maven-generator:1.5 ${dockerUsURL}/qa/data/maven-generator:1.5"
+        sh "docker tag docker.jfrog.io/qa/data/maven-generator:1.3 ${dockerUsURL}/qa/data/maven-generator:1.5"
         sh "docker push ${dockerUsURL}/qa/data/debian-generator:1.2"
         sh "docker push ${dockerUsURL}/qa/data/docker-generator:1.2"
         sh "docker push ${dockerUsURL}/qa/data/rpm-generator:1.2"
