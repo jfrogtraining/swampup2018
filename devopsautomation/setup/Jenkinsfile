@@ -5,12 +5,12 @@ node {
     def jobList = ["step1-create-application-war-file","step2-create-docker-image-template","step3-create-docker-image-product","step4-create-helm-chart","step5-create-helm-release-bundle",
                    "maven-example","data-generator-debian","data-generator-docker","data-generator-maven","data-generator-rpm","maven-release-bundle"]
 
-    git branch: 'beta',
+    git branch: 'xray-debug',
        credentialsId: '3eb629b4-ca19-465e-95dd-531402ee6c5f',
        url: 'https://github.com/jfrogtraining/swampup2018'
-    def namespace_us = "${env.NAMESPACE_US_DOMAIN}"
-    def USSERVER_URL = "https://artifactory-${namespace_us}/artifactory"
-    def USEDGE_URL = "https://artifactory-edge1-${namespace_us}/artifactory"
+    def namespace_us = "10.70.30.5"
+    def USSERVER_URL = "http://10.70.30.5/artifactory"
+    def USEDGE_URL = "http://${namespace_us}/artifactory"
     def namespace_au =  "${env.NAMESPACE_AU_DOMAIN}"
     def AUEDGE_URL = "https://artifactory-edge2-${namespace_au}/artifactory"
     def AUSERVER_URL = "https://artifactory-${namespace_au}/artifactory"
@@ -21,16 +21,16 @@ node {
 
     createRepo(USSERVER_URL, "devopsautomation/setup/betalocalrepo.yaml")
     createRepo(USSERVER_URL, "devopsautomation/setup/betaremote.yaml")
-    createRepo(AUSERVER_URL, "devopsautomation/setup/betalocalrepo.yaml")
-    createRepo(AUSERVER_URL, "devopsautomation/setup/betaremote.yaml")
+    //createRepo(AUSERVER_URL, "devopsautomation/setup/betalocalrepo.yaml")
+    //createRepo(AUSERVER_URL, "devopsautomation/setup/betaremote.yaml")
 
-    createRepo(USEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
-    createRepo(AUEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
-    createRepo(INEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
+    //createRepo(USEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
+    //createRepo(AUEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
+    //createRepo(INEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
     unblockDownload (USSERVER_URL)
-    unblockDownload (AUSERVER_URL)
+    //unblockDownload (AUSERVER_URL)
     downloadDependencies(USSERVER_URL, dockerUsURL, dockerAuURL)
-    downloadDependencies(AUSERVER_URL, dockerUsURL, dockerAuURL)
+    //downloadDependencies(AUSERVER_URL, dockerUsURL, dockerAuURL)
 
     jobList.each () {
       setNewBuildNumber("${it}")
