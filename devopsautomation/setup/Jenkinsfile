@@ -55,9 +55,9 @@ def unblockDownload (artUrl) {
 def downloadDependencies (serverurl, dockerUsURL, dockerAuURL) {
     sh 'curl -fL jfrog https://getcli.jfrog.io | sh'
     sh './jfrog rt c clear < /dev/null'
-    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: ARTTRAINING, usernameVariable: 'TRAININGUSERNAME', passwordVariable: 'TRAININGPASSWORD']]) {
+    withCredentials([usernamePassword(credentialsId: 'jfrogtraining', passwordVariable: 'TRAININGPASSWORD', usernameVariable: 'TRAININGUSERNAME'), usernamePassword(credentialsId: 'DOCKER-REGISTRY', passwordVariable: 'DOCKERPASSSWORD', usernameVariable: 'DOCKERUSERNAME')])  {
         sh "./jfrog rt c training --url https://jfrogtraining.jfrog.io/jfrogtraining --user ${TRAININGUSERNAME} --password ${TRAININGPASSWORD} < /dev/null"
-        sh "docker login jfrogtraining-docker.jfrog.io -u ${TRAININGUSERNAME} -p ${TRAININGPASSWORD}"
+        sh "docker login jfrogtraining-docker.jfrog.io -u ${DOCKERUSERNAME} -p ${DOCKERPASSSWORD}"
         sh 'docker pull docker.jfrog.io/qa/data/debian-generator:1.2'
         sh 'docker pull docker.jfrog.io/qa/data/docker-generator:1.2'
         sh 'docker pull docker.jfrog.io/qa/data/rpm-generator:1.2'
@@ -68,9 +68,9 @@ def downloadDependencies (serverurl, dockerUsURL, dockerAuURL) {
     sh './jfrog rt dl tomcat-local/java/ ./ --server-id training'
     sh './jfrog rt dl generic-local/helm ./ --server-id training'
 
-    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
+   withCredentials([usernamePassword(credentialsId: 'jfrogtraining', passwordVariable: 'TRAININGPASSWORD', usernameVariable: 'TRAININGUSERNAME'), usernamePassword(credentialsId: 'DOCKER-REGISTRY', passwordVariable: 'DOCKERPASSSWORD', usernameVariable: 'DOCKERUSERNAME')])  {
         sh "./jfrog rt c beta --user ${USERNAME} --password ${PASSWORD} --url ${serverurl} < /dev/null"
-        sh "docker login ${dockerUsURL} -u ${USERNAME} -p ${PASSWORD}"
+        sh "docker login ${dockerUsURL} -u ${DOCKERUSERNAME} -p ${DOCKERPASSSWORD}"
         sh "docker tag docker.jfrog.io/qa/data/debian-generator:1.2 ${dockerUsURL}/qa/data/debian-generator:1.2"
         sh "docker tag docker.jfrog.io/qa/data/docker-generator:1.2 ${dockerUsURL}/qa/data/docker-generator:1.2"
         sh "docker tag docker.jfrog.io/qa/data/rpm-generator:1.2 ${dockerUsURL}/qa/data/rpm-generator:1.2"
