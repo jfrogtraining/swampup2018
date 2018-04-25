@@ -55,8 +55,8 @@ def unblockDownload (artUrl) {
 def downloadDependencies (serverurl, dockerUsURL, dockerAuURL) {
     sh 'curl -fL jfrog https://getcli.jfrog.io | sh'
     sh './jfrog rt c clear < /dev/null'
-    withCredentials([usernamePassword(credentialsId: 'jfrogtraining', passwordVariable: 'TRAININGPASSWORD', usernameVariable: 'TRAININGUSERNAME'), usernamePassword(credentialsId: 'DOCKER-REGISTRY', passwordVariable: 'DOCKERPASSSWORD', usernameVariable: 'DOCKERUSERNAME')])  {
-        sh "./jfrog rt c training --url https://jfrogtraining.jfrog.io/jfrogtraining --user ${TRAININGUSERNAME} --password ${TRAININGPASSWORD} < /dev/null"
+    withCredentials([usernamePassword(credentialsId: 'jfrogtraining', passwordVariable: 'TRAININGPASSWORD', usernameVariable: 'TRAININGUSERNAME'), usernamePassword(credentialsId: 'DOCKER-REGISTRY', passwordVariable: 'DOCKERPASSSWORD', usernameVariable: 'DOCKERUSERNAME'),usernamePassword(credentialsId: 'ADMIN-PASSWORD', passwordVariable: 'PASSSWORD', usernameVariable: 'USER')])  {
+        sh "./jfrog rt c training --url serverurl --user ${USERNAME} --password ${PASSWORD} < /dev/null"
         sh "docker login docker.jfrog.io -u ${DOCKERUSERNAME} -p ${DOCKERPASSSWORD}"
         sh 'docker pull docker.jfrog.io/qa/data/debian-generator:1.1'
         sh 'docker pull docker.jfrog.io/qa/data/docker-generator:1.2'
@@ -83,7 +83,7 @@ def downloadDependencies (serverurl, dockerUsURL, dockerAuURL) {
    // sh './jfrog rt u java/ tomcat-local/ --server-id beta --flat false'
    // sh './jfrog rt u org/ tomcat-local/ --server-id beta --flat false'
     //sh './jfrog rt u helm generic-local/helm --server-id beta --flat true'
-    sh 'cp ./jfrog /usr/sbin/jfrog'
+    //sh 'cp ./jfrog /usr/sbin/jfrog'
     sh 'cp helm /usr/sbin/helm'
     sh "chmod 777 /usr/sbin/helm"
 }

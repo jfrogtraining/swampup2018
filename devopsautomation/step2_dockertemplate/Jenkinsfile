@@ -9,7 +9,7 @@ node {
     def domainName = jobName.matches("(.*)-au") ? "${env.NAMESPACE_AU_DOMAIN}":"${env.NAMESPACE_US_DOMAIN}"
     def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${domainName}"
     println "Domain Used : " + namespace_domain
-    def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
+    def SERVER_URL = "http://10.70.30.5/artifactory"
     def XRAYURL = "https://xray-${namespace_domain}"
 
     def REPO = "docker"
@@ -18,7 +18,7 @@ node {
     def rtServer = Artifactory.newServer url: SERVER_URL, credentialsId: CREDENTIALS
     def buildInfo = Artifactory.newBuildInfo()
     def tagName
-    def artdocker_registry = "${REPO}-artifactory-${namespace_domain}"
+    def artdocker_registry = "docker.artifactory"
     buildInfo.env.capture = true
 
     //Fetch all depensencies from Artifactory
