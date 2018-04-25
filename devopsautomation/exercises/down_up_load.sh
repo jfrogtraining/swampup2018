@@ -1,15 +1,15 @@
 #!/bin/bash
-#Exercise 4 - Create User and Repositories
-#Reference URL - https://www.jfrog.com/confluence/display/RTF/Artifactory+REST+API
+# Exercise 4 - Create User and Repositories
+# Reference URL - https://www.jfrog.com/confluence/display/RTF/Artifactory+REST+API
  
-#Variables
+# Variables
 ART_URL="https://artifactory-solutions-us.jfrogbeta.com/artifactory"
 ART_PASSWORD="password"
 USER="swamp2018"
 ACCESS_TOKEN=""
 USER_APIKEY=""
 
-Exercise 4 - Create User and Repositories
+# Exercise 4 - Create User and Repositories
 createUser () {
   curl -uadmin:"${ART_PASSWORD}" -X PUT -H 'Content-Type: application/json' \
       "${ART_URL}"/api/security/users/${USER} -d '{
@@ -39,10 +39,35 @@ createRepo () {
   echo ${response[@]}
 }
 
+# Exercise 5 - JFrog CLI
+loginArt () {
+   echo "Log into Artifactories"
+   curl -fL jfrog https://getcli.jfrog.io | sh
+   ./jfrog rt c jfrogtraining --url=https://jfrogtraining.jfrog.io/jfrogtraining/ --apikey=AKCp2Vo711zssGkjSUgXYc32HVfNhUbddJ9uLGRhQDpDTWuKr7EFeZorbpbiFfBu2haZ81YLX
+   ./jfrog rt c swampup2018 --url=${ART_URL} --apikey=${USER_APIKEY}
+}
+
+downloadDependenciesTools () {
+# Download the required dependencies from remote artifactory instance (jfrogtraining)
+# paths - 
+#    tomcat-local/org/apache/apache-tomcat/
+#    tomcat-local/java/
+#    generic-local/helm 
+# Similar to using third party binaries that are not available from remote repositories. 
+
+  echo "Fetch tomcat for the later docker framework build"
+  ./jfrog rt dl tomcat-local/org/apache/apache-tomcat/ ./ --server-id jfrogtraining --threads 5
+  echo "Fetch java for the later docker framework build"
+  ./jfrog rt dl tomcat-local/java/ ./ --server-id jfrogtraining --threads 5
+  echo "Fetch Helm Client for later helm chart"
+  ./jfrog rt dl generic-local/helm ./ --server-id jfrogtraining
+}
+
 main () {
    createUser
    getUserSecurity
    createRepo "training-repo.yaml"
+   downloadDependenciesTools
 }
 
 main
