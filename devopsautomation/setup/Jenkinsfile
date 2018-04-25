@@ -69,7 +69,7 @@ def downloadDependencies (serverurl, dockerUsURL, dockerAuURL) {
     sh './jfrog rt dl generic-local/helm ./ --server-id training'
 
    withCredentials([usernamePassword(credentialsId: 'jfrogtraining', passwordVariable: 'TRAININGPASSWORD', usernameVariable: 'TRAININGUSERNAME'), usernamePassword(credentialsId: 'DOCKER-REGISTRY', passwordVariable: 'DOCKERPASSSWORD', usernameVariable: 'DOCKERUSERNAME')])  {
-        sh "./jfrog rt c beta --user ${USERNAME} --password ${PASSWORD} --url ${serverurl} < /dev/null"
+        sh "./jfrog rt c beta --user ${DOCKERUSERNAME} --password ${DOCKERPASSSWORD} --url ${serverurl} < /dev/null"
         sh "docker login ${dockerUsURL} -u ${DOCKERUSERNAME} -p ${DOCKERPASSSWORD}"
         sh "docker tag docker.jfrog.io/qa/data/debian-generator:1.1 ${dockerUsURL}/qa/data/debian-generator:1.2"
         sh "docker tag docker.jfrog.io/qa/data/docker-generator:1.2 ${dockerUsURL}/qa/data/docker-generator:1.2"
