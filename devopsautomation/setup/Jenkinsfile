@@ -2,39 +2,30 @@
 import groovy.json.JsonSlurper
 
 node {
-    def jobList = ["step1-create-application-war-file","step2-create-docker-image-template","step3-create-docker-image-product","step4-create-helm-chart","step5-create-helm-release-bundle",
-                   "maven-example","data-generator-debian","data-generator-docker","data-generator-maven","data-generator-rpm","maven-release-bundle"]
+    // def jobList = ["step1-create-application-war-file","step2-create-docker-image-template","step3-create-docker-image-product","step4-create-helm-chart","step5-create-helm-release-bundle",
+    //                "maven-example","data-generator-debian","data-generator-docker","data-generator-maven","data-generator-rpm","maven-release-bundle"]
 
-    git branch: 'beta',
+    git branch: 'eplus-orbitera',
        credentialsId: '3eb629b4-ca19-465e-95dd-531402ee6c5f',
        url: 'https://github.com/jfrogtraining/swampup2018'
-    def namespace_us = "${env.NAMESPACE_US_DOMAIN}"
-    def USSERVER_URL = "https://artifactory-${namespace_us}/artifactory"
-    def USEDGE_URL = "https://artifactory-edge1-${namespace_us}/artifactory"
-    def namespace_au =  "${env.NAMESPACE_AU_DOMAIN}"
-    def AUEDGE_URL = "https://artifactory-edge2-${namespace_au}/artifactory"
-    def AUSERVER_URL = "https://artifactory-${namespace_au}/artifactory"
-    def namespace_in = "${env.NAMESPACE_IN_DOMAIN}"
-    def INEDGE_URL = "https://artifactory-edge3-${namespace_in}/artifactory"
-    def dockerUsURL = "docker-artifactory-${namespace_us}"
-    def dockerAuURL = "docker-artifactory-${namespace_au}"
 
-    createRepo(USSERVER_URL, "devopsautomation/setup/betalocalrepo.yaml")
-    createRepo(USSERVER_URL, "devopsautomation/setup/betaremote.yaml")
-    createRepo(AUSERVER_URL, "devopsautomation/setup/betalocalrepo.yaml")
-    createRepo(AUSERVER_URL, "devopsautomation/setup/betaremote.yaml")
+    def ARTHA_URL = "http://jfrog.local/artifactory"
+    def USEDGE_URL = "http://jfrog.local:8090/artifactory"
+    def EUEDGE_URL = "http://jfrog.local:8091/artifactory"
+    def dockerUsURL = "jfrog.local:5000"
+
+    createRepo(ARTHA_URL, "devopsautomation/setup/betalocalrepo.yaml")
+    createRepo(ARTHA_URL, "devopsautomation/setup/betaremote.yaml")
 
     createRepo(USEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
-    createRepo(AUEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
-    createRepo(INEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
-    unblockDownload (USSERVER_URL)
-    unblockDownload (AUSERVER_URL)
-    downloadDependencies(USSERVER_URL, dockerUsURL, dockerAuURL)
-    downloadDependencies(AUSERVER_URL, dockerUsURL, dockerAuURL)
+    createRepo(EUEDGE_URL, "devopsautomation/setup/betalocalrepo.yaml")
+    unblockDownload (ARTHA_URL)
 
-    jobList.each () {
-      setNewBuildNumber("${it}")
-    }
+    downloadDependencies(ARTHA_URL, dockerUsURL)
+
+    // jobList.each () {
+    //   setNewBuildNumber("${it}")
+    // }
 }
 
 def createRepo (artUrl, yamlFile) {
@@ -52,7 +43,7 @@ def unblockDownload (artUrl) {
 }
 
 // to do- change the password to use Jenkins credentials for artifactory.
-def downloadDependencies (serverurl, dockerUsURL, dockerAuURL) {
+def downloadDependencies (serverurl, dockerUsURL) {
     sh 'curl -fL jfrog https://getcli.jfrog.io | sh'
     sh './jfrog rt c clear < /dev/null'
     withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: ARTTRAINING, usernameVariable: 'TRAININGUSERNAME', passwordVariable: 'TRAININGPASSWORD']]) {
