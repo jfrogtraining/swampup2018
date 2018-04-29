@@ -7,10 +7,10 @@ node {
     def CLEAN_REPO = "YES"
     def WATCHNAME = env.JOB_NAME
     def jobName = env.JOB_NAME
-    def domainName = jobName.matches("(.*)-au") ? "${env.NAMESPACE_AU_DOMAIN}":"10.70.30.5"
+    def domainName = jobName.matches("(.*)-au") ? "${env.NAMESPACE_AU_DOMAIN}":"10.70.30.103"
     def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${domainName}"
     println "name space is " + namespace_domain
-    def SERVER_URL = "http://10.70.30.5/artifactory"
+    //def SERVER_URL = "http://${domainName}/artifactory"
     def XRAYURL = "https://xray-${namespace_domain}"
     def server = Artifactory.newServer url: SERVER_URL, credentialsId: CREDENTIALS
     def rtGradle = Artifactory.newGradleBuild()
