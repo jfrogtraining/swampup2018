@@ -1,6 +1,6 @@
 {
   "targetRepo" : "TARGETREPO",
-  "dockerRepository" : "docker-app",
+  "dockerRepository" : "docker-framework",
   "tag" : "@",
   "targetTag" : "latest",
   "copy": true

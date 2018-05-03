@@ -1,4 +1,4 @@
-FROM jfrog.local:5001/ubuntu:latest
+FROM jfrog.local:5002/ubuntu:latest
 
 MAINTAINER Stanley Fong stanleyf@jfrog.com
 

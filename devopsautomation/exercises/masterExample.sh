@@ -7,6 +7,7 @@
 
 # Variables
 ART_URL="https://artifactory-solutions-us.jfrogbeta.com/artifactory"
+ARTDOCKER_REGISTRY="docker-artifactory-solutions-us.jfrogbeta.com"
 ART_PASSWORD="password"
 USER="swamp2018"
 ACCESS_TOKEN=""
@@ -61,9 +62,9 @@ downloadDependenciesTools () {
 # Similar to using third party binaries that are not available from remote repositories. 
 
   echo "Fetch tomcat for the later docker framework build"
-  ./jfrog rt dl tomcat-local/org/apache/apache-tomcat/ ./ --server-id ${REMOTE_ART_ID} --threads 5
+  ./jfrog rt dl tomcat-local/org/apache/apache-tomcat/apache-tomcat-8.0.32.tar.gz ./tomcat/apache-tomcat-8.tar.gz --server-id ${REMOTE_ART_ID} --threads 5 --flat true
   echo "Fetch java for the later docker framework build"
-  ./jfrog rt dl tomcat-local/java/ ./ --server-id ${REMOTE_ART_ID} --threads 5
+  ./jfrog rt dl tomcat-local/java/jdk-8u91-linux-x64.tar.gz ./jdk/jdk-8-linux-x64.tar.gz --server-id ${REMOTE_ART_ID} --threads 5 --flat true
   echo "Fetch Helm Client for later helm chart"
   ./jfrog rt dl generic-local/helm ./ --server-id ${REMOTE_ART_ID}
 }
@@ -110,6 +111,22 @@ step1-create1-application () {
    ./jfrog rt bp gradle-example $1 --server-id ${SERVER_ID}
 }
 
+step2-create-docker-image-template () {
+  git clone https://github.com/jfrogtraining/swampup2018.git
+  cd swampup2018/devopsautomation/step2_dockertemplate
+  downloadDependenciesTools
+  tagName = "${artdocker_registry}/docker-framework:$BUILD_NUMBER"  
+  docker login $ARTDOCKER_REGISTRY -u $USER -p $ART_PASSWORD
+  docker build -t $tagName . 
+  docker run -d -p 3000:3000 ${artdocker_registry}/docker-framework:$BUILD_NUMBER
+  sleep 10 
+  curl --retry 10 --retry-delay 5 -v http://localhost:3000
+  ./jfrog rt dp $tagname docker --build-name=step2-create-docker-image-template --build-number=$BUILD_NUMBER
+  ./jfrog rt bce step2-create-docker-image-template $BUILD_NUMBER
+  ./jfrog rt bp step2-create-docker-image-template $BUILD_NUMBER
+}
+
+
 
 # Excercise 8
 deleteLatestDockerFolder () {
@@ -148,12 +165,12 @@ main () {
    getUserSecurity
    # createRepo "training-repo.yaml"
    loginArt
-   # downloadDependenciesTools
+   downloadDependenciesTools
    # uploadFileSpec "swampupfilespecUpload.json"
    # aqlsearch "aql/implfilter.aql"
    # latestDockerTag "docker-prod-local" "docker-app" 
    # step1-create1-application 10
-   deleteLatetDockerTag "docker-prod-local" "docker-app"   
+   # deleteLatetDockerTag "docker-prod-local" "docker-app"   
 }
 
 main
