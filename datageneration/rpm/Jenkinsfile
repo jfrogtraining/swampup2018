@@ -23,10 +23,12 @@ node  {
 	def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
 	Random random = new Random()
 
-	 def SIZE = (random.nextInt(40) + 1).toString() + "M"
-     def PNUM = random.nextInt(2) + 1
+	 def SIZE = (random.nextInt(10) + 1).toString() + "M"
+	 def RNUM = random.nextInt(2)
+     def PNUM = RNUM + 1
+     def NNUM = RNUM + 2
      def DEST = ""
-     def FNUM = ""
+     def FNUM = "1"
      def COMPRESS = ""
      def PROPS = ""
      def REPO = "rpm-dev-local"
@@ -34,24 +36,27 @@ node  {
      def PASSWORD = "password"
      def DEPTH = ""
      def DPATH = "/${BUILD_NUMBER}/os/x86_64/RPMS/"
-     def TESTING = "beta"
-     def WATCHNAME = "rpm-dev-local"
-     def XRAYPASSWORD = "password"
-     def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${env.NAMESPACE_US_DOMAIN}"
-     def ARTIURL = "https://artifactory-${namespace_domain}/artifactory"
-     def XRAYURL = "https://xray-${namespace_domain}"
-     def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
-     def rtServer = Artifactory.newServer url: SERVER_URL, username: 'admin', password: 'password'
+     def TESTING = "swampup"
+
+     withCredentials([usernamePassword(credentialsId: CREDENTIALS, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
+        PASSWORD = repoPwd
+        XRAYPASSWORD = repoPwd
+        ARTIUSER = repoUser
+     }
+     def namespace_domain = "${NAMESPACEDOMAIN}"
+     def ARTIURL = "http://${namespace_domain}/artifactory"
+     def SERVER_URL = "http://${namespace_domain}/artifactory"
+     def rtServer = Artifactory.newServer url: SERVER_URL, username: ARTIUSER, password: PASSWORD
      def buildInfo = Artifactory.newBuildInfo()
-     def dockerURL = "docker-artifactory-${namespace_domain}"
+     def dockerURL = "${namespace_domain}:5001"
 
 	stage ('Generating Debian Data') {
-        createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
+        //createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
 		currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
 		withCredentials([usernamePassword(credentialsId: CREDENTIALS, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
 		   sh "docker login -u ${repoUser} -p ${repoPwd} ${dockerURL}"
 		   sh "docker pull ${dockerURL}/qa/data/rpm-generator:1.2"
-		   sh "docker run --name rpm-generator-$BUILD_NUMBER -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${SIZE} -e PNUM=${PNUM} -e FNUM=${FNUM} ${dockerURL}/qa/data/rpm-generator:1.2"
+		   sh "docker run --name rpm-generator-$BUILD_NUMBER -v /etc/hosts:/etc/hosts -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${SIZE} -e PNUM=${PNUM} -e FNUM=${FNUM} ${dockerURL}/qa/data/rpm-generator:1.2"
 		   sh 'docker logs -f rpm-generator-$BUILD_NUMBER'
 		}
 		rtServer.publishBuildInfo buildInfo
@@ -59,8 +64,10 @@ node  {
 
 	stage ('Check Last File') {
 		def server = Artifactory.newServer url: ARTIURL, username: ARTIUSER, password: PASSWORD
-		def path = get_path()
-		def fileName = get_file(PNUM)
+		def path = "${BUILD_NUMBER}/os/x86_64/RPMS"
+		def ext = "rpm"
+	    def nextNum = NNUM
+		def fileName = "sample_rpm${PNUM}_${BUILD_NUMBER}-${PNUM}-${nextNum}.x86_64.$ext"
 
 		def downloadSpec = """{
 			"files": [
@@ -92,42 +99,4 @@ node  {
 	stage ('Cleanup') {
 		sh 'docker rm -vf rpm-generator-$BUILD_NUMBER'
 	}
-}
-
-def get_file (PNUM) {
-	def ext = "rpm"
-	def nextNum = PNUM.toInteger() + 1
-	return ("sample_rpm${PNUM}_${BUILD_NUMBER}-${PNUM}-${nextNum}.x86_64.$ext")
-}
-
-def get_path () {
-	return ("${BUILD_NUMBER}/os/x86_64/RPMS")
-}
-
-
-def createXrayWatch (watch, ignoreAlertsCheck, XRAYURL) {
-    def watchConfig = """ {
-        "active"      : true,
-        "name"        : "${watch}",
-        "target_type" : "repository",
-        "art_id"      : "artCi1",
-        "target_name" : "${watch}"
-    }"""
-
-    if (ignoreAlertsCheck) return 0
-    def createWatch = ["curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "${watchConfig}", "-u", "admin:password", "${XRAYURL}/api/v1/watches"]
-
-    def curlString = "curl -uadmin:password " + "-X GET " + XRAYURL
-    def getWatch = curlString +  "/api/v1/watches/${watch}"
-    try {
-        def getWatchResponse = getWatch.execute().text
-        def jsonSlurper = new JsonSlurper()
-        def watchexist = jsonSlurper.parseText("${getWatchResponse}")
-        if (watchexist.error) {
-            def createWatchResponse = createWatch.execute().text
-        }
-    } catch (Exception e) {
-              println "XRay cannot retrieve or create watch information ${e.message}"
-              ignoreAlertsCheck = true
-    }
 }

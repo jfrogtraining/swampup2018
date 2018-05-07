@@ -20,37 +20,39 @@ node {
     def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
     Random random = new Random()
 
-    def SIZE = (random.nextInt(50) + 1).toString() + "M"
+    def SIZE = (random.nextInt(10) + 1).toString() + "M"
     def PNUM = random.nextInt(2) + 1
     def DEST = "build-${BUILD_NUMBER}-debian"
-    def FNUM = ""
+    def FNUM = "1"
     def COMPRESS = ""
     def PROPS = ""
     def REPO = "debian-dev-local"
     def ARTIUSER = "admin"
     def PASSWORD = "password"
+    withCredentials([usernamePassword(credentialsId: CREDENTIALS, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
+        PASSWORD = repoPwd
+        XRAYPASSWORD = repoPwd
+        ARTIUSER = repoUser
+    }
     def DEPTH = ""
     def DPATH = "build-${BUILD_NUMBER}-debian"
-    def TESTING = "beta"
-    def WATCHNAME = "debian-dev-local"
-    def XRAYPASSWORD = "password"
-    def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${env.NAMESPACE_US_DOMAIN}"
-    def ARTIURL = "https://artifactory-${namespace_domain}/artifactory"
-    def XRAYURL = "https://xray-${namespace_domain}"
-    def SERVER_URL = "https://artifactory-${namespace_domain}/artifactory"
-    def rtServer = Artifactory.newServer url: SERVER_URL, username: 'admin', password: 'password'
+    def TESTING = "swampup"
+    
+    def namespace_domain = "${NAMESPACEDOMAIN}"
+    def ARTIURL = "http://${namespace_domain}/artifactory"
+    def SERVER_URL = "http://${namespace_domain}/artifactory"
+    def rtServer = Artifactory.newServer url: SERVER_URL, username: ARTIUSER, password: PASSWORD
     def buildInfo = Artifactory.newBuildInfo()
-    def dockerURL = "docker-artifactory-${namespace_domain}"
+    def dockerURL = "${namespace_domain}:5001"
 
   stage ('Generating Debian Data') {
-    createXrayWatch (WATCHNAME, ignoreAlertsCheck, XRAYURL)
     currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
     withCredentials([usernamePassword(credentialsId: CREDENTIALS, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
        sh 'docker system prune -f'
        sh 'rm -rf /home/jenkins/jenkins_slave/tools/'
        sh "docker login -u ${repoUser} -p ${repoPwd} ${dockerURL}"
        sh "docker pull ${dockerURL}/qa/data/debian-generator:1.2"
-       sh "docker run --name debian-generator-$BUILD_NUMBER -e PROPS=${PROPS} -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${SIZE} -e PNUM=${PNUM} -e FNUM=${FNUM} -e COMPRESS=${COMPRESS} ${dockerURL}/qa/data/debian-generator:1.2"
+       sh "docker run --name debian-generator-$BUILD_NUMBER -v /etc/hosts:/etc/hosts -e PROPS=${PROPS} -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${SIZE} -e PNUM=${PNUM} -e FNUM=${FNUM} -e COMPRESS=${COMPRESS} ${dockerURL}/qa/data/debian-generator:1.2"
        sh 'docker logs -f debian-generator-$BUILD_NUMBER'
     }
     rtServer.publishBuildInfo buildInfo
@@ -102,30 +104,3 @@ def get_path () {
   return ("build-$BUILD_NUMBER-debian")
 }
 
-
-def createXrayWatch (watch, ignoreAlertsCheck, XRAYURL) {
-    def watchConfig = """ {
-        "active"      : true,
-        "name"        : "${watch}",
-        "target_type" : "repository",
-        "art_id"      : "artCi1",
-        "target_name" : "${watch}"
-    }"""
-
-    if (ignoreAlertsCheck) return 0
-    def createWatch = ["curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "${watchConfig}", "-u", "admin:password", "${XRAYURL}/api/v1/watches"]
-
-    def curlString = "curl -uadmin:password " + "-X GET " + XRAYURL
-    def getWatch = curlString +  "/api/v1/watches/${watch}"
-    try {
-        def getWatchResponse = getWatch.execute().text
-        def jsonSlurper = new JsonSlurper()
-        def watchexist = jsonSlurper.parseText("${getWatchResponse}")
-        if (watchexist.error) {
-            def createWatchResponse = createWatch.execute().text
-        }
-    } catch (Exception e) {
-              println "XRay cannot retrieve or create watch information ${e.message}"
-              ignoreAlertsCheck = true
-    }
-}
