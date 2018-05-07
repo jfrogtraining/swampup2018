@@ -1,19 +1,34 @@
 #!/usr/bin/env groovy
+import groovy.json.JsonSlurper
 
-node ('master') {
-    git url: 'https://github.com/jfrogtraining/swampup'
+node {
+
+// -------------------------------------------------------------------------------------------------------
+// Parameters
+    def REPO = "docker"                     //virtual docker repo
+    def PROMOTE_REPO = "docker-prod-local"  //promotion target repo
+    def SOURCE_REPO = "docker-stage-local"  //source target repo
+    def NAMESPACEDOMAIN = "jfrog.local"     //domain name to use: jfrog.local
+//
+// Jenkins parameter 
+// FAIL_BUILD: 'true' - fail build if violations are detected.  
+// -------------------------------------------------------------------------------------------------------
+
+    //Clone example project from GitHub repository
+    git url: 'https://github.com/jfrogtraining/swampup2018.git'
+    def SERVER_URL = "http://${NAMESPACEDOMAIN}/artifactory"
     def rtServer = Artifactory.newServer url: SERVER_URL, credentialsId: CREDENTIALS
     def buildInfo = Artifactory.newBuildInfo()
     def tagName
+    def artdocker_registry = "${NAMESPACEDOMAIN}:5001"
     buildInfo.env.capture = true
 
+    //Fetch all depensencies from Artifactory
     stage('Dependencies') {
-        dir('automation/docker-framework') {
+        currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
+        dir('project-examples/step2_dockertemplate') {
             try {
                 println "Gather Java and Tomcat"
-
-                def downloadFrameworkSpec = readFile "${env.WORKSPACE}/automation/docker-framework/framework-download.json"
-
                 def downloadSpec = """{
                          "files": [
                           {
@@ -43,22 +58,26 @@ node ('master') {
             }
         }
     }
-    stage('build') {
-        dir ('automation/docker-framework') {
+    //Build docker image named "docker-framework" with Java 8 and Tomcat  
+    stage('Build') {
+        dir ('project-examples/step2_dockertemplate') {
+            updateBaseDockerFile(artdocker_registry)
             withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
                     def rtDocker = Artifactory.docker server: rtServer
-                    tagName = "${ARTDOCKER_REGISTRY}/docker-framework:${env.BUILD_NUMBER}"
-                    docker.build(tagName)
-                    rtDocker.push(tagName, REPO, buildInfo)
+                    tagName = "${artdocker_registry}/docker-framework:${env.BUILD_NUMBER}"
+                    docker.withRegistry ("https://${artdocker_registry}", CREDENTIALS) {
+                         sh "docker login -u ${USERNAME} -p ${PASSWORD} https://${artdocker_registry}"
+                         docker.build(tagName)
+                    }
+                    buildInfo = rtDocker.push(tagName, REPO, buildInfo)
                     rtServer.publishBuildInfo buildInfo
             }
         }
     }
-
-    stage('test') {
-        dir('automation/docker-framework/framework-test') {
-            def gradleWarDownload1 = readFile "${env.WORKSPACE}/automation/docker-framework/gradeWar-download.json"
-
+    //Test docker image
+    stage('Test') {
+        dir('project-examples/step2_dockertemplate/framework-test') {
+        
             def gradleWarDownload = """{
             "files": [
                 {
@@ -71,22 +90,23 @@ node ('master') {
             }"""
 
             rtServer.download(gradleWarDownload)
+            updateBaseDockerFile(artdocker_registry)
             updateDockerFile()
-            def tagDockerFramework = "${ARTDOCKER_REGISTRY}/docker-framework-test:${env.BUILD_NUMBER}"
+            def tagDockerFramework = "${artdocker_registry}/docker-framework-test:${env.BUILD_NUMBER}"
             docker.build(tagDockerFramework)
             if (testFramework(tagDockerFramework)) {
                 println "Setting property and promotion"
-                updateProperty ("qa.functional-test=pass")
+                updateProperty ("functional-test=pass", SERVER_URL, SOURCE_REPO )
                 sh "docker rmi ${tagName}"
             } else {
-                updateProperty ("qa.functional-test=fail; qa.failed-test=page-not-loaded")
+                updateProperty ("functional-test=fail; failed-test=page-not-loaded", SERVER_URL, SOURCE_REPO)
                 currentBuild.result = 'UNSTABLE'
                 sh "docker rmi ${tagName}"
                 return
             }
         }
     }
-
+    //Scan build's Artifacts in Xray
     stage('Xray Scan') {
         if (XRAY_SCAN == "YES") {
             def xrayConfig = [
@@ -99,26 +119,24 @@ node ('master') {
         } else {
             println "No Xray scan performed. To enable set XRAY_SCAN = YES"
         }
-        //sleep 60
+        sleep 60
     }
+    
+    //Promote image from local staging repositoy to production repository 
+    stage ('Promote') {
 
-    stage ('promote') {
-        dir ('automation/docker-framework') {
-            def promotionConfig = [
-              'buildName'          : env.JOB_NAME,
-              'buildNumber'        : env.BUILD_NUMBER,
-              'targetRepo'         : PROMOTE_REPO,
-              'comment'            : 'Framework test with latest version of application',
-              'sourceRepo'         : SOURCE_REPO,
-              'status'             : 'Released',
-              'includeDependencies': false,
-              'copy'               : true
-            ]
-            rtServer.promote promotionConfig
-            reTagLatest (SOURCE_REPO)
-            reTagLatest (PROMOTE_REPO)
+        dir ('project-examples/step2_dockertemplate') {
+            promoteBuild (SOURCE_REPO, PROMOTE_REPO, SERVER_URL)
+            
+            // create latest tag on both source and promote target repo 
+            reTagLatest (SOURCE_REPO, PROMOTE_REPO, SOURCE_REPO, SERVER_URL)
+            reTagLatest (PROMOTE_REPO, PROMOTE_REPO, SOURCE_REPO, SERVER_URL)
          }
     }
+}
+
+def updateBaseDockerFile (artdocker_registry) {
+      sh "sed -i -e 's/jfrog.local:5002/${artdocker_registry}/' Dockerfile"
 }
 
 def updateDockerFile () {
@@ -126,26 +144,32 @@ def updateDockerFile () {
     sh 'sed -i "s/docker-framework:latest/docker-framework:$BUILD_NUMBER/" Dockerfile'
 }
 
-def reTagLatest (targetRepo) {
+def reTagLatest (targetRepo, promote_repo, source_repo, server_url) {
      def BUILD_NUMBER = env.BUILD_NUMBER
      sh 'sed -E "s/@/$BUILD_NUMBER/" retag.json > retag_out.json'
      switch (targetRepo) {
-          case PROMOTE_REPO :
-              sh 'sed -E "s/TARGETREPO/${PROMOTE_REPO}/" retag_out.json > retaga_out.json'
+          case promote_repo :
+              println "Tagging " + promote_repo + " with latest"
+              sh ("""
+                sed -E "s/TARGETREPO/${promote_repo}/g" retag_out.json > retaga_out.json
+                """)
               break
-          case SOURCE_REPO :
-               sh 'sed -E "s/TARGETREPO/${SOURCE_REPO}/" retag_out.json > retaga_out.json'
+          case source_repo :
+               println "Tagging " + source_repo + " with latest"
+               sh ("""
+                 sed -E "s/TARGETREPO/${source_repo}/" retag_out.json > retaga_out.json
+                """)
                break
       }
       sh 'cat retaga_out.json'
       withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
-          def curlString = "curl -u " + env.USERNAME + ":" + env.PASSWORD + " " + SERVER_URL
+          def curlString = "curl -u " + env.USERNAME + ":" + env.PASSWORD + " " + server_url
           def regTagStr = curlString +  "/api/docker/$targetRepo/v2/promote -X POST -H 'Content-Type: application/json' -T retaga_out.json"
           println "Curl String is " + regTagStr
           sh regTagStr
       }
 }
-
+//test docker image by runnning container
 def testFramework (tag) {
     def result = true
     docker.image(tag).withRun('-p 8181:8181') {c ->
@@ -162,11 +186,41 @@ def testFramework (tag) {
     return result
 }
 
-def updateProperty (property) {
+def updateProperty (property, artserverUrl, sourceRepo) {
     withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
-            def curlString = "curl -u " + env.USERNAME + ":" + env.PASSWORD + " " + "-X PUT " + SERVER_URL
-            def updatePropStr = curlString +  "/api/storage/${SOURCE_REPO}/docker-framework/${env.BUILD_NUMBER}?properties=${property}"
+            def curlString = "curl -u " + env.USERNAME + ":" + env.PASSWORD + " " + "-X PUT " + artserverUrl
+            def updatePropStr = curlString +  "/api/storage/${sourceRepo}/docker-framework/${env.BUILD_NUMBER}?properties=${property}"
             println "Curl String is " + updatePropStr
             sh updatePropStr
      }
 }
+
+
+def promoteBuild (source_repo, promote_repo, SERVER_URL) {
+
+    def buildPromotion = """ {
+        "status"      : "Released",
+        "comment"     : "Framework test with latest version of application",
+        "ciUser"      : "jenkins",
+        "sourceRepo"  : "${source_repo}",
+        "targetRepo"  : "${promote_repo}",
+        "copy"        : true,
+        "dependencies" : false,
+        "failFast": true
+    }"""
+
+    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
+        def createPromo = ["curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "${buildPromotion }", "-u", "${env.USERNAME}:${env.PASSWORD}", "${SERVER_URL}/api/build/promote/${env.JOB_NAME}/${env.BUILD_NUMBER}"]
+        try {
+           def getPromoResponse = createPromo.execute().text
+           def jsonSlurper = new JsonSlurper()
+           def promoStatus = jsonSlurper.parseText("${getPromoResponse}")
+           if (promoStatus.error) {
+               println "Promotion failed: " + promoStatus
+           }
+        } catch (Exception e) {
+           println "Promotion failed: ${e.message}"
+        }
+    }
+}
+

@@ -1,20 +1,46 @@
 #!/usr/bin/env groovy
+import groovy.json.JsonSlurper
+import groovy.util.*
 
-node ('master') {
-    git url: 'https://github.com/jfrogtraining/swampup'
+node {
+// -------------------------------------------------------------------------------------------------------
+// Parameters
+    def REPO = "docker"                     //virtual docker repo
+    def PROMOTE_REPO = "docker-prod-local"  //promotion target repo
+    def SOURCE_REPO = "docker-stage-local"  //source target repo
+    def NAMESPACEDOMAIN = "jfrog.local"     //domain name to use: jfrog.local
+
+// Jenkins parameter 
+// FAIL_BUILD: 'true' - fail build if violations are detected.  
+// -------------------------------------------------------------------------------------------------------
+
+    //Clone example project from GitHub repository
+    git url: 'https://github.com/jfrogtraining/swampup2018'
+    def SERVER_URL = "http://${NAMESPACEDOMAIN}/artifactory"
     def rtServer = Artifactory.newServer url: SERVER_URL, credentialsId: CREDENTIALS
     def buildInfo = Artifactory.newBuildInfo()
+    def tagName
+    def artdocker_registry = "${NAMESPACEDOMAIN}:5001"
     def tagDockerApp
-    def rtDocker
+    def rtDocker = Artifactory.docker server: rtServer
     buildInfo.env.capture = true
-
+    
+    //Fetch all depedencies from Artifactory
     stage ('Dependencies') {
-        dir ('automation/docker-app') {
+        currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
+        dir ('project-examples/step3_dockerproduct') {
             try {
                 println "Gather Released Docker Framework and Gradle War file"
-                sh 'rm -rf war'
-                def downloadAppSpec = readFile "${env.WORKSPACE}/automation/docker-app/appmodules-download.json"
-                rtServer.download(downloadAppSpec, buildInfo )
+                def gradleWarDownload = """{
+                    "files": [
+                      {
+                        "pattern": "gradle-release-local/org/jfrog/example/gradle/webservice/1.1.2/*.war",
+                        "target": "war/webservice.war",
+                        "flat": "true"
+                      }
+                    ]
+                 }"""
+                rtServer.download(gradleWarDownload, buildInfo )
             } catch (Exception e) {
                 println "Caught Exception during resolution. Message ${e.message}"
                 throw e
@@ -22,34 +48,46 @@ node ('master') {
         }
     }
 
-    stage ('build & deploy') {
-        dir ('automation/docker-app') {
-            tagDockerApp = "${ARTDOCKER_REGISTRY}/docker-app:${env.BUILD_NUMBER}"
-            docker.build(tagDockerApp)
+    //Build docker image named docker-app 
+    stage ('Build & Deploy') {
+        dir ('project-examples/step3_dockerproduct') {
+            updateBaseDockerFile (artdocker_registry)
             withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
-                rtDocker = Artifactory.docker server: rtServer
-                rtDocker.push(tagDockerApp, REPO, buildInfo)
+                tagDockerApp = "${artdocker_registry}/docker-app:${env.BUILD_NUMBER}"
+                docker.withRegistry ("http://${artdocker_registry}", CREDENTIALS) {
+                      sh "docker login -u ${USERNAME} -p ${PASSWORD} http://${artdocker_registry}"
+                      docker.build(tagDockerApp)
+                }
+                buildInfo = rtDocker.push(tagDockerApp, REPO, buildInfo)
                 rtServer.publishBuildInfo buildInfo
              }
         }
      }
 
-     stage ('test') {
-        dir('automation/docker-app/app-test') {
-            sh 'docker rmi '+tagDockerApp+' || true'
-            rtDocker.pull (tagDockerApp)
+    //Test docker image
+     stage ('Test') {
+        dir('project-examples/step3_dockerproduct/app-test') {
+
+            withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
+                sh 'docker rmi '+tagDockerApp+' || true'
+                def rtDockera = Artifactory.docker server: rtServer
+                docker.withRegistry ("http://${artdocker_registry}", CREDENTIALS) {
+                      sh "docker login -u ${USERNAME} -p ${PASSWORD} http://${artdocker_registry}"
+                      sh "docker pull ${tagDockerApp}"
+                }
+            }
             if (testApp(tagDockerApp)) {
                   println "Setting property and promotion"
-                  updateProperty ("qa.functional-test=pass")
+                  sh 'docker rmi '+tagDockerApp+' || true'
              } else {
-                  updateProperty ("qa.functional-test=fail; qa.failed-test=page-not-loaded")
                   currentBuild.result = 'UNSTABLE'
                   return
              }
         }
      }
-
-     stage('Xray Scan') {
+     
+    //Scan Build Artifacts in Xray
+    stage('Xray Scan') {
          if (XRAY_SCAN == "YES") {
              def xrayConfig = [
                 'buildName'     : env.JOB_NAME,
@@ -58,76 +96,79 @@ node ('master') {
               ]
               def xrayResults = rtServer.xrayScan xrayConfig
               echo xrayResults as String
-              echo 'how am I doing?'
          } else {
               println "No Xray scan performed. To enable set XRAY_SCAN = YES"
          }
-//         sleep 60
-     }
-
-     stage ('promotion') {
-        dir('automation/docker-app/app-test') {
-            def promotionConfig = [
-              'buildName'          : env.JOB_NAME,
-              'buildNumber'        : env.BUILD_NUMBER,
-              'targetRepo'         : PROMOTE_REPO,
-              'comment'            : 'App works with latest released version of gradle swampup app, tomcat and jdk',
-              'sourceRepo'         : SOURCE_REPO,
-              'status'             : 'Released',
-              'includeDependencies': false,
-              'copy'               : true
-            ]
-            rtServer.promote promotionConfig
-            reTagLatest (SOURCE_REPO)
-            reTagLatest (PROMOTE_REPO)
+         sleep 60
+     } 
+     
+    //Promote docker image from staging local repo to production repo in Artifactory 
+     stage ('Promote') {
+        dir('project-examples/step3_dockerproduct/app-test') {
+            promoteBuild (SOURCE_REPO, PROMOTE_REPO, SERVER_URL)
+            reTagLatest (PROMOTE_REPO, SERVER_URL)            
         }
-
-        // promote war file from gradle-release to gradle-prod
-
      }
 }
 
 def testApp (tag) {
-    def result = true
-    docker.image(tag).withRun('-p 8181:8181') {c ->
+    docker.image(tag).withRun('-p 9191:8181') {c ->
         sleep 10
-        def stdout = sh(script: 'curl "http://localhost:8181/swampup/"', returnStdout: true)
+        def stdout = sh(script: 'curl "http://localhost:9191/swampup/"', returnStdout: true)
         if (stdout.contains("Welcome Docker Lifecycle Training")) {
             println "*** Passed Test: " + stdout
+            return true
         } else {
             println "*** Failed Test: " + stdout
-            result = false
+            return false
         }
     }
-    sh "docker rmi ${tag}"
-    return result
 }
-
-def reTagLatest (targetRepo) {
+//Tag docker image
+def reTagLatest (promote_repo, server_url) {
     def BUILD_NUMBER = env.BUILD_NUMBER
     sh 'sed -E "s/@/$BUILD_NUMBER/" retag.json > retag_out.json'
-     switch (targetRepo) {
-          case PROMOTE_REPO :
-              sh 'sed -E "s/TARGETREPO/${PROMOTE_REPO}/" retag_out.json > retaga_out.json'
-              break
-          case SOURCE_REPO :
-               sh 'sed -E "s/TARGETREPO/${SOURCE_REPO}/" retag_out.json > retaga_out.json'
-               break
-      }
+    sh ("""
+      sed -E "s/TARGETREPO/${promote_repo}/g" retag_out.json > retaga_out.json
+      """)
     sh 'cat retaga_out.json'
     withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
-        def curlString = "curl -u " + env.USERNAME + ":" + env.PASSWORD + " " + SERVER_URL
-        def regTagStr = curlString +  "/api/docker/$targetRepo/v2/promote -X POST -H 'Content-Type: application/json' -T retaga_out.json"
+        def curlString = "curl -u " + env.USERNAME + ":" + env.PASSWORD + " " + server_url
+        def regTagStr = curlString +  "/api/docker/${promote_repo}/v2/promote -X POST -H 'Content-Type: application/json' -T retaga_out.json"
         println "Curl String is " + regTagStr
         sh regTagStr
     }
 }
 
-def updateProperty (property) {
+def updateBaseDockerFile (artdocker_registry) {
+    def alias = "jfrog.local:5003"
+    sh "sed -i 's/${alias}/${artdocker_registry}/' Dockerfile"
+}
+
+def promoteBuild (source_repo, promote_repo, SERVER_URL) {
+
+    def buildPromotion = """ {
+        "status"      : "Released",
+        "comment"     : "Framework test with latest version of application",
+        "ciUser"      : "jenkins",
+        "sourceRepo"  : "${source_repo}",
+        "targetRepo"  : "${promote_repo}",
+        "copy"        : true,
+        "dependencies" : false,
+        "failFast": true
+    }"""
+
     withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
-            def curlString = "curl -u " + env.USERNAME + ":" + env.PASSWORD + " " + "-X PUT " + SERVER_URL
-            def updatePropStr = curlString +  "/api/storage/${SOURCE_REPO}/docker-app/${env.BUILD_NUMBER}?properties=${property}"
-            println "Curl String is " + updatePropStr
-            sh updatePropStr
-     }
+        def createPromo = ["curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "${buildPromotion }", "-u", "${env.USERNAME}:${env.PASSWORD}", "${SERVER_URL}/api/build/promote/${env.JOB_NAME}/${env.BUILD_NUMBER}"]
+        try {
+           def getPromoResponse = createPromo.execute().text
+           def jsonSlurper = new JsonSlurper()
+           def promoStatus = jsonSlurper.parseText("${getPromoResponse}")
+           if (promoStatus.error) {
+               println "Promotion failed: " + promoStatus
+           }
+        } catch (Exception e) {
+           println "Promotion exception: ${e.message}"
+        }
+    }
 }

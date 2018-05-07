@@ -1,11 +1,28 @@
+#!/usr/bin/env groovy
+import groovy.json.JsonSlurper
+
 node {
+
+// -------------------------------------------------------------------------------------------------------
+// Parameters
+    def DEPLOY_REPO = "gradle-release"      //target repository
+    def CLEAN_REPO = "YES"                  //clean the gradle workspace
+    def NAMESPACEDOMAIN = "jfrog.local"     //domain name to use: jfrog.local
+//
+// Jenkins parameter 
+// FAIL_BUILD: 'true' - fail build if violations are detected.  
+// -------------------------------------------------------------------------------------------------------
+
+    def SERVER_URL = "http://${NAMESPACEDOMAIN}/artifactory"
     def server = Artifactory.newServer url: SERVER_URL, credentialsId: CREDENTIALS
     def rtGradle = Artifactory.newGradleBuild()
 
+    //Clone example code from GitHub repository
     stage 'Build'
         git url: 'https://github.com/jfrogtraining/project-examples.git', branch: 'swampup2017'
 
     stage 'Artifactory configuration'
+        currentBuild.displayName = TESTING + "-" + BUILD_NUMBER
         rtGradle.tool = GRADLE_TOOL // Tool name from Jenkins configuration
         rtGradle.deployer repo:DEPLOY_REPO, server: server
         rtGradle.resolver repo:'libs-release', server: server
@@ -13,20 +30,32 @@ node {
         def buildInfo = Artifactory.newBuildInfo()
         buildInfo.env.capture = true
 
+    //Run gradle build
     stage 'Exec Gradle'
         if(CLEAN_REPO == "YES") {
             sh 'rm -rf ~/.gradle/caches'
         }
         rtGradle.run rootDir: "gradle-examples/4/gradle-example-ci-server/", buildFile: 'build.gradle', tasks: 'clean artifactoryPublish', buildInfo: buildInfo
 
-    stage 'Publish & Scan'
+    //Publish artifacts to Artifactory along with build information and scan build artifacts in Xray
+    stage 'Publish Build Information & Scan Artifacts'
         server.publishBuildInfo buildInfo
         if (XRAY_SCAN == "YES") {
-            def scanConfig = [
-                'buildName'      : env.JOB_NAME,
-                'buildNumber'    : env.BUILD_NUMBER,
-                'failBuild'      : false
-            ]
+            def scanConfig
+            if (FAIL_BUILD == 'false') {
+                scanConfig = [
+                    'buildName'      : env.JOB_NAME,
+                    'buildNumber'    : env.BUILD_NUMBER,
+                    'failBuild'      : false
+                ]
+            } else {
+            (FAIL_BUILD == 'false') {
+                scanConfig = [
+                 'buildName'      : env.JOB_NAME,
+                 'buildNumber'    : env.BUILD_NUMBER,
+                 'failBuild'      : true
+                ]}
+            }
             def scanResult = server.xrayScan scanConfig
             echo scanResult as String
          }
