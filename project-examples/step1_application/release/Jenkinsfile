@@ -35,6 +35,9 @@ node {
         if(CLEAN_REPO == "YES") {
             sh 'rm -rf ~/.gradle/caches'
         }
+        dir("gradle-examples/4/gradle-example-ci-server/") {
+            sh 'sh ./increment.sh'
+        }
         rtGradle.run rootDir: "gradle-examples/4/gradle-example-ci-server/", buildFile: 'build.gradle', tasks: 'clean artifactoryPublish', buildInfo: buildInfo
 
     //Publish artifacts to Artifactory along with build information and scan build artifacts in Xray

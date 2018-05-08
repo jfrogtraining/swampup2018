@@ -31,10 +31,11 @@ node {
         dir ('project-examples/step3_dockerproduct') {
             try {
                 println "Gather Released Docker Framework and Gradle War file"
+                def gradleLatestPath = getLatestGradleWar(SERVER_URL).trim()
                 def gradleWarDownload = """{
                     "files": [
                       {
-                        "pattern": "gradle-release-local/org/jfrog/example/gradle/webservice/1.1.2/*.war",
+                        "pattern": "gradle-release-local/${gradleLatestPath}/*.war",
                         "target": "war/webservice.war",
                         "flat": "true"
                       }
@@ -172,3 +173,21 @@ def promoteBuild (source_repo, promote_repo, SERVER_URL) {
         }
     }
 }
+
+def getLatestGradleWar (SERVER_URL) {
+    def response = ''
+    def gradleLatestWarSrc = """items.find(
+    {
+        "repo":{"\$eq":"gradle-release-local"}, "name":{"\$match":"webservice-*.war"},"@build.name":"step1-create-application-war-file","@unit-test":"pass"
+    }
+).sort({"\$desc" : ["created"]}).limit(1)"""
+    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
+        def curlString = "curl -s -u " + env.USERNAME + ":" + env.PASSWORD + " " + SERVER_URL
+        def gradleLatestStr = curlString +  "/api/search/aql -X POST -H 'Content-Type: text/plain' -d '" + gradleLatestWarSrc + "' | python -c 'import sys, json; print json.load(sys.stdin)[\"results\"][0][\"path\"]'"
+        println "Curl String is " + gradleLatestStr
+        response = sh (script: gradleLatestStr, returnStdout: true)
+    }
+    println "Curl response: " + response
+    return response
+}
+
