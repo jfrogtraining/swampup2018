@@ -83,19 +83,20 @@ aqlsearch () {
   local jarList=$(echo ${response[@]} | jq '.results[].archives[].items[] | .repo + "/" + .path + "/" + .name ')
   for jar in "${jarList[@]}"
   do
-     printf "${jar} \n" 
+     printf "  ${jar} \n" 
   done
 }
 
 
 # Exercise 6b - AQL find latest Docker build 
 latestDockerTag () {
+   echo "Find latest docker tag"
    REPO=$1
    IMAGE=$2
    aqlString='items.find({"repo":"'$REPO'","type":"folder","$and":[{"path":{"$match":"'$IMAGE'*"}},{"path":{"$nmatch":"'$IMAGE'/latest"}}]}).include("path","created","name").sort({"$desc":["created"]}).limit(1)'
    local response=($(curl -s -u"${USER}":"${USER_APIKEY}" -H 'Content-Type: text/plain' -X POST "${ART_URL}"/api/search/aql -d "${aqlString}"))
    tag=$(echo ${response[@]} | jq '.results[0].name')
-   printf "'$IMAGE':'$tag'\n"
+   printf "  '$IMAGE':'$tag'\n"
 }
 
 # Exercise 7 
