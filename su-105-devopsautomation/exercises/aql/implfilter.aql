@@ -1,0 +1,3 @@
+items.find ({
+	"archive.entry.name":{"$eq":"Impl.class"}
+}).include("archive.item.repo", "archive.item.path", "archive.item.artifact.module.build.name", "archive.item.artifact.module.build.number")
