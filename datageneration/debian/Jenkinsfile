@@ -20,8 +20,10 @@ node {
     def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
     Random random = new Random()
 
-    def SIZE = (random.nextInt(10) + 1).toString() + "M"
-    def PNUM = random.nextInt(2) + 1
+    def size = (!SIZE.allWhitespace) ? SIZE : (random.nextInt(10) + 1).toString() + "M"
+    println "Size used is ${size}"
+    def pnum = (!PNUM.allWhitespace) ? PNUM : random.nextInt(2) + 1
+    println "Number of packages - pnum : ${pnum}"
     def DEST = "build-${BUILD_NUMBER}-debian"
     def FNUM = "1"
     def COMPRESS = ""
@@ -52,7 +54,7 @@ node {
        sh 'rm -rf /home/jenkins/jenkins_slave/tools/'
        sh "docker login -u ${repoUser} -p ${repoPwd} ${dockerURL}"
        sh "docker pull ${dockerURL}/qa/data/debian-generator:1.2"
-       sh "docker run --name debian-generator-$BUILD_NUMBER -v /etc/hosts:/etc/hosts -e PROPS=${PROPS} -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${SIZE} -e PNUM=${PNUM} -e FNUM=${FNUM} -e COMPRESS=${COMPRESS} ${dockerURL}/qa/data/debian-generator:1.2"
+       sh "docker run --name debian-generator-$BUILD_NUMBER -v /etc/hosts:/etc/hosts -e PROPS=${PROPS} -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${size} -e PNUM=${pnum} -e FNUM=${FNUM} -e COMPRESS=${COMPRESS} ${dockerURL}/qa/data/debian-generator:1.2"
        sh 'docker logs -f debian-generator-$BUILD_NUMBER'
     }
     rtServer.publishBuildInfo buildInfo
@@ -61,7 +63,7 @@ node {
   stage ('Check Last File') {
     def server = Artifactory.newServer url: ARTIURL, username: ARTIUSER, password: PASSWORD
     def path = get_path()
-    def fileName = get_file(PNUM)
+    def fileName = get_file(pnum)
 
     def downloadSpec = """{
       "files": [
@@ -95,9 +97,9 @@ node {
   }
 }
 
-def get_file (PNUM) {
+def get_file (pnum) {
   def ext = "deb"
-  return ("gen-deb$PNUM-$BUILD_NUMBER.$ext")
+  return ("gen-deb$pnum-$BUILD_NUMBER.$ext")
 }
 
 def get_path () {

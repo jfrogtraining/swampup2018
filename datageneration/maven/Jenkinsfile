@@ -21,10 +21,13 @@ node {
     Random random = new Random()
 
     def unique_packages = random.nextInt(2) + 1    // number of packages
-    def major_packages = random.nextInt(2) + 1     // number of major versions
-    def minor_packages = random.nextInt(2) +1
+    def major_packages = (!MAJOR_PACKAGES.allWhitespace) ? MAJOR_PACKAGES : random.nextInt(2) + 1 
+    println "Number of major package used is ${major_packages}"
+    def minor_packages = (!MINOR_PACKAGES.allWhitespace) ? MINOR_PACKAGES : random.nextInt(2) + 1
+    println "Number of minor package used is ${minor_packages}"
     def nooffiles = random.nextInt(2) + 1
-    def filesize = (random.nextInt(2) + 1).toString() + "M"
+    def filesize = (!FILESIZE.allWhitespace) ? FILESIZE : (random.nextInt(2) + 1).toString() + "M"
+    println "FileSize used is ${filesize}"
     def prefix = "beta"
     def repository = "maven-data-local"
     def artifactory_user = "admin"
