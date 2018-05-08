@@ -26,7 +26,7 @@ node  {
      println "Size used is ${size}"
      def pnum = (!PNUM.allWhitespace) ? PNUM : random.nextInt(2) + 1
      println "PNUM value is ${pnum}"
-     def NNUM = random.nextInt(2) + 1
+     def NNUM = pnum + 1
      def DEST = ""
      def FNUM = "1"
      def COMPRESS = ""
