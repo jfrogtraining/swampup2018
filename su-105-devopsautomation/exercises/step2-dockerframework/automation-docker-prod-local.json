@@ -1,0 +1,10 @@
+{
+  "key": "automation-docker-prod-local",
+  "rclass" : "local",
+  "packageType": "docker",
+  "description": "Ready for production release Framework Repository",
+  "notes": "SwampUp Automation Training",
+  "includesPattern": "**/*",
+  "excludesPattern": "",
+  "repoLayoutRef" : "simple-default"
+}
