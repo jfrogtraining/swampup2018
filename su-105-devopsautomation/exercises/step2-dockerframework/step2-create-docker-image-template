@@ -118,18 +118,14 @@ step1-create1-application () {
 step2-create-docker-image-template () {
   echo "step2-create-docker-image-template  - building docker base for web applications"
   git clone https://github.com/jfrogtraining/swampup2018.git
-  cd swampup2018/devopsautomation/step2_dockertemplate
+  cd swampup2018/su-105-devopsautomation/exercises/step2-dockerframework
   echo "Downloading dependencies"
   downloadDependenciesTools
-  getLatestGradleWar  "gradle-release-local"
   TAGNAME="${ARTDOCKER_REGISTRY}/docker-framework:${1}"
   echo $TAGNAME
   docker login $ARTDOCKER_REGISTRY -u $USER -p $ART_PASSWORD
   echo "Building docker base image"
   docker build -t $TAGNAME .
-  #docker run -d -p 3000:3000 $TAGNAMME
-  #sleep 10
-  #curl --retry 10 --retry-delay 5 -v http://localhost:3000
   echo "Publishing docker freamework base image to artifactory"
   ./jfrog rt dp $TAGNAME docker --build-name="step2-create-docker-image-template" --build-number=$1 --server-id=${SERVER_ID}
   echo "Collecting environment variable for buildinfo"
@@ -137,7 +133,7 @@ step2-create-docker-image-template () {
   echo  "publishing buildinfo"
   ./jfrog rt bp step2-create-docker-image-template $1 --server-id=${SERVER_ID}
   docker rmi $TAGNAME
-  echo "Successfuily deployed"
+  echo "Successfuily deployed framework"
 }
 
 getLatestGradleWar () {
