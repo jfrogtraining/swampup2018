@@ -6,14 +6,15 @@
 #   JFROG CLI - https://www.jfrog.com/confluence/display/CLI/JFrog+CLI 
 
 # Variables
-ART_URL="https://artifactory-solutions-us.jfrogbeta.com/artifactory"
-ARTDOCKER_REGISTRY="docker-artifactory-solutions-us.jfrogbeta.com"
-ART_PASSWORD="password"
+ART_URL="http://35.202.159.126/artifactory"
+ARTDOCKER_REGISTRY="jfrog.local:5001"
+ART_PASSWORD="QbyTDIE759"
 USER="swamp2018"
 ACCESS_TOKEN=""
 USER_APIKEY=""
 SERVER_ID="swampup2018"
 REMOTE_ART_ID="jfrogtraining"
+GRADLE_BUILD_NAME="gradle-example"
 
 # Exercise 4 - Create User and Repositories
 createUser () {
@@ -109,7 +110,7 @@ step1-create1-application () {
    ./jfrog rt gradlec gradle-example.config
    # To run a gradle build
    echo "Running gradle build"
-   ./jfrog rt gradle "clean artifactoryPublish -b ./build.gradle" gradle-example.config --build-name=gradle-example --build-number=$1
+   ./jfrog rt gradle "clean artifactoryPublish -b ./build.gradle" gradle-example.config --build-name=$GRADLE_BUILD_NAME --build-number=$1
    # Environment variables are collected using the build-collect-env (bce) command.
    echo "Collecting environment varilable for buildinfo"
    ./jfrog rt bce gradle-example $1
@@ -124,21 +125,24 @@ step2-create-docker-image-template () {
   cd swampup2018/devopsautomation/step2_dockertemplate
   echo "Downloading dependencies"
   downloadDependenciesTools
-  tagName = "${artdocker_registry}/docker-framework:"$1
+  getLatestGradleWar  "gradle-release-local"
+  TAGNAME="${ARTDOCKER_REGISTRY}/docker-framework:${1}"
+  echo $TAGNAME
   docker login $ARTDOCKER_REGISTRY -u $USER -p $ART_PASSWORD
   echo "Building docker base image"
-  docker build -t $tagName .
-  docker run -d -p 3000:3000 ${artdocker_registry}/docker-framework:$1
-  sleep 10
-  curl --retry 10 --retry-delay 5 -v http://localhost:3000
+  docker build -t $TAGNAME .
+  #docker run -d -p 3000:3000 $TAGNAMME
+  #sleep 10
+  #curl --retry 10 --retry-delay 5 -v http://localhost:3000
   echo "Publishing docker freamework base image to artifactory"
-  ./jfrog rt dp $tagname docker --build-name=step2-create-docker-image-template --build-number=$1
+  ./jfrog rt dp $TAGNAME docker --build-name="step2-create-docker-image-template" --build-number=$1 --server-id=${SERVER_ID}
+  echo "Collecting environment variable for buildinfo"
   ./jfrog rt bce step2-create-docker-image-template $1
-  ./jfrog rt bp step2-create-docker-image-template $1
+  echo  "publishing buildinfo"
+  ./jfrog rt bp step2-create-docker-image-template $1 --server-id=${SERVER_ID}
+  docker rmi $TAGNAME
   echo "Successfuily deployed"
 }
-
-
 
 # Excercise 8
 deleteLatestDockerFolder () {
@@ -170,6 +174,16 @@ deleteLatetDockerTag () {
     filespec="$(mktemp)"
     deleteLatestDockerFolder ${filespec} ${REPO} ${DOCKERIMAGE}
     echo -e "y" | ./jfrog rt del --spec=${filespec} --server-id=${SERVER_ID}
+}
+
+getLatestGradleWar () {
+   REPO=$1
+   aqlString='items.find ({"repo":{"$eq":"gradle-release-local"},"name":{"$match":"webservice-*.war"},"@build.name":"gradle-example"}).include("created","path","name").sort({"$desc" : ["created"]}).limit(1)'
+   local response=($(curl -s -u"${USER}":"${USER_APIKEY}" -H 'Content-Type: text/plain' -X POST "${ART_URL}"/api/search/aql -d "${aqlString}"))
+   path=$(echo ${response[@]} | jq '.results[0].path' | sed 's/"//g')
+   name=$(echo ${response[@]} | jq '.results[0].name' | sed 's/"//g')
+   echo ${path}/${name}
+   ./jfrog rt dl gradle-release-local/${path}/${name} ./war/webservice.war --server-id=${SERVER_ID}  --flat=true
 }
 
 main () {
