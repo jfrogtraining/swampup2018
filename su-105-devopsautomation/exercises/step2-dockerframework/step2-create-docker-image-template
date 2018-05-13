@@ -117,7 +117,6 @@ step1-create1-application () {
 
 step2-create-docker-image-template () {
   echo "step2-create-docker-image-template  - building docker base for web applications"
-  git clone https://github.com/jfrogtraining/swampup2018.git
   cd swampup2018/su-105-devopsautomation/exercises/step2-dockerframework
   echo "Downloading dependencies"
   downloadDependenciesTools
