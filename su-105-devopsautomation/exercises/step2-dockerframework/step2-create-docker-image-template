@@ -154,7 +154,7 @@ main () {
    #uploadFileSpec "swampupfilespecUpload.json"
    #aqlsearch "aql/implfilter.aql"
    #latestDockerTag "docker-prod-local" "docker-app"
-   step1-create1-application 34
+   #step1-create1-application 34
    step2-create-docker-image-template 34
  }
 
