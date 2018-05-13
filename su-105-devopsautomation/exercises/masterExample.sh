@@ -153,7 +153,7 @@ step3-create-docker-image-product () {
   docker build -t $TAGNAME .
   docker run -d -p 9191:8181 $TAGNAME
   sleep 10
-  curl --retry 10 --retry-delay 5 -v http://localhost:9191/swampup/
+  curl --retry 10 --retry-delay 5 -v http://localhost:9191
   echo "Publishing docker freamework base image to artifactory"
   ./jfrog rt dp $TAGNAME docker --build-name="step3-create-docker-image-product" --build-number=$1 --server-id=${SERVER_ID}
   echo "Collecting environment variable for buildinfo"
@@ -217,6 +217,7 @@ main () {
    # latestDockerTag "docker-prod-local" "docker-app" 
    # step1-create1-application 10
    step2-create-docker-image-template 34
+   step3-create-docker-image-product 34  
    # deleteLatetDockerTag "docker-prod-local" "docker-app"   
 }
 
