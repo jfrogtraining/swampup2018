@@ -41,10 +41,16 @@ curl -uadmin:$ADMIN_PASSWORD -X PUT http://jfrog.local/artifactory/api/security/
 ################################################
 ssh admin@jfrog.local
 
-sudo docker pull jfrogtraining-docker-dev.jfrog.io/soleng_openldap:1.1
+#Login to Artifactory docekr registry provisioned for the training
+sudo docker login jfrogtraining-docker.jfrog.io -u security-training -p password
 
-sudo docker run -itd --name openldap -p 389:389 --network root_default jfrogtraining-docker-dev.jfrog.io/soleng_openldap:1.1
+#Pull openLDAP image from Artifactory
+sudo docker pull jfrogtraining-docker.jfrog.io/soleng_openldap
 
+#run the openLDAP container
+sudo docker run -itd --name openldap -p 389:389 --network root_default jfrogtraining-docker.jfrog.io/soleng_openldap
+
+#Populate the openLDAP with data
 sudo docker exec openldap /init.sh
 
 ################################################
