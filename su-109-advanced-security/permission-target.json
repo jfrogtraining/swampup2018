@@ -1,0 +1,8 @@
+{
+    "repositories": ["generic-local"],
+    "principals": {
+          "groups" : {
+            "swampdev" : ["w","n", "r"]
+          }
+      }
+  }
