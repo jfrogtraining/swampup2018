@@ -88,7 +88,7 @@ FOR /F "tokens=*" %a in ('curl -uadmin:%ADMIN_PASSWORD%  http://jfrog.local:8094
 FOR /F "tokens=*" %a in ('curl -uadmin:%ADMIN_PASSWORD%  http://jfrog.local:8095/artifactory/api/system/service_id') do SET id_s2=%a
 
 #generate a refreshable token shared between the three instances
-curl -H "X-Jfrog-Art-API:%ADMIN_KEY%" -X POST "http://jfrog.local/artifactory/api/security/token" -d "username=kermit" -d "scope=member-of-groups:swampdev" -d "audience=%id_main% %id_s2% %id_s3%" -d "refreshable=true"
+curl -H "X-Jfrog-Art-API:%ADMIN_KEY%" -X POST "http://jfrog.local/artifactory/api/security/token" -d "username=kermit" -d "scope=member-of-groups:swampdev" -d "audience=%id_main% %id_s1% %id_s2%" -d "refreshable=true"
 
 #Result example
 {
@@ -103,7 +103,7 @@ set token=<TokenGenerated>
 set refresh=<RefreshToken>
 
 #Test your token
-curl -ukermit:%token% -T ./token.json http://jfrog.local/artifactory/example-repo-local/token.json
+curl -ukermit:%token% -T ./token.json http://jfrog.local/artifactory/generic-local/token.json
 
 curl -H"Authorization: Bearer %token%" -T ./token.json http://jfrog.local:8095/artifactory/generic-local/token.json
 

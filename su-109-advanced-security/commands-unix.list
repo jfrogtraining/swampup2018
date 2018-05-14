@@ -69,10 +69,10 @@ export ADMIN_KEY=<apiKey>
 #Establish a circle of trust
 ################################################
 #check standalone 1 trusted store
-docker exec -it  artifactory-standalone-1 ls -l “/var/opt/jfrog/artifactory/access/etc/keys/trusted/”
+docker exec -it  artifactory-standalone-1 ls -l "/var/opt/jfrog/artifactory/access/etc/keys/trusted/"
 
 #check standalone 2 trusted store
-docker exec -it  artifactory-standalone-2 ls -l “/var/opt/jfrog/artifactory/access/etc/keys/trusted/”
+docker exec -it  artifactory-standalone-2 ls -l "/var/opt/jfrog/artifactory/access/etc/keys/trusted/"
 
 #get artifactory instances service_id
 export id_main=$(curl -H "X-Jfrog-Art-API:$ADMIN_KEY"  http://jfrog.local/artifactory/api/system/service_id)
@@ -82,7 +82,7 @@ export id_s1=$(curl -uadmin:$ADMIN_PASSWORD  http://jfrog.local:8094/artifactory
 export id_s2=$(curl -uadmin:$ADMIN_PASSWORD  http://jfrog.local:8095/artifactory/api/system/service_id)
 
 #generate a refreshable token shared between the three instances
-curl -H "X-Jfrog-Art-API:$ADMIN_KEY" -X POST "http://jfrog.local/artifactory/api/security/token" -d "username=kermit" -d "scope=member-of-groups:swampdev" -d "audience=$id_main $id_s2 $id_s3" -d "refreshable=true"
+curl -H "X-Jfrog-Art-API:$ADMIN_KEY" -X POST "http://jfrog.local/artifactory/api/security/token" -d "username=kermit" -d "scope=member-of-groups:swampdev" -d "audience=$id_main $id_s1 $id_s2" -d "refreshable=true"
 
 #Result example
 {
@@ -97,7 +97,7 @@ export token=<TokenGenerated>
 export refresh=<RefreshToken>
 
 #Test your token
-curl -ukermit:$token -T ./token.json http://jfrog.local/artifactory/example-repo-local/token.json
+curl -ukermit:$token -T ./token.json http://jfrog.local/artifactory/generic-local/token.json
 
 curl -H"Authorization: Bearer $token" -T ./token.json http://jfrog.local:8095/artifactory/generic-local/token.json
 
