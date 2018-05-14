@@ -7,7 +7,7 @@
 
 # Variables
 ART_URL="http://35.202.159.126/artifactory"
-ARTDOCKER_REGISTRY="jfrogbeta.com:5001"
+ARTDOCKER_REGISTRY="jfrog.local:5001"
 ART_PASSWORD="QbyTDIE759"
 USER="swamp2018"
 ACCESS_TOKEN=""
@@ -115,6 +115,61 @@ step1-create1-application () {
    jfrog rt bp gradle-example $1 --server-id ${SERVER_ID}
 }
 
+step2-create-docker-image-template () {
+  echo "step2-create-docker-image-template  - building docker base for web applications"
+  cd swampup2018/su-105-devopsautomation/exercises/step2-dockerframework
+  echo "Downloading dependencies"
+  downloadDependenciesTools
+  TAGNAME="${ARTDOCKER_REGISTRY}/docker-framework:${1}"
+  echo $TAGNAME
+  docker login $ARTDOCKER_REGISTRY -u $USER -p $ART_PASSWORD
+  echo "Building docker base image"
+  docker build -t $TAGNAME .
+  echo "Publishing docker freamework base image to artifactory"
+  ./jfrog rt dp $TAGNAME docker --build-name="step2-create-docker-image-template" --build-number=$1 --server-id=${SERVER_ID}
+  echo "Collecting environment variable for buildinfo"
+  ./jfrog rt bce step2-create-docker-image-template $1
+  echo  "publishing buildinfo"
+  ./jfrog rt bp step2-create-docker-image-template $1 --server-id=${SERVER_ID}
+  docker rmi $TAGNAME
+  echo "Successfuily deployed framework"
+}
+
+step3-create-docker-image-product () {
+  echo "step3-create-docker-image-product - building docker app "
+  cd swampup2018/su-105-devopsautomation/exercises/step3_dockerapp
+  echo "Downloading dependencies"
+  downloadDependenciesTools
+  getLatestGradleWar  "gradle-release-local"
+  TAGNAME="${ARTDOCKER_REGISTRY}/docker-app:${1}"
+  echo $TAGNAME
+  docker login $ARTDOCKER_REGISTRY -u $USER -p $ART_PASSWORD
+  echo "Building docker app image"
+  docker build -t $TAGNAME .
+  docker run -d -p 9191:8181 $TAGNAME
+  sleep 10
+  curl --retry 10 --retry-delay 5 -v http://localhost:9191
+  echo "Publishing docker freamework base image to artifactory"
+  ./jfrog rt dp $TAGNAME docker --build-name="step3-create-docker-image-product" --build-number=$1 --server-id=${SERVER_ID}
+  echo "Collecting environment variable for buildinfo"
+  ./jfrog rt bce step3-create-docker-image-product $1
+  echo  "publishing buildinfo"
+  ./jfrog rt bp step3-create-docker-image-product $1 --server-id=${SERVER_ID}
+  docker rmi $TAGNAME
+  echo "Successfuily deployed docke app"
+}
+
+
+getLatestGradleWar () {
+   REPO=$1
+   aqlString='items.find ({"repo":{"$eq":"gradle-release-local"},"name":{"$match":"webservice-*.war"},"@build.name":"gradle-example"}).include("created","path","name").sort({"$desc" : ["created"]}).limit(1)'
+   local response=($(curl -s -u"${USER}":"${USER_APIKEY}" -H 'Content-Type: text/plain' -X POST "${ART_URL}"/api/search/aql -d "${aqlString}"))
+   path=$(echo ${response[@]} | jq '.results[0].path' | sed 's/"//g')
+   name=$(echo ${response[@]} | jq '.results[0].name' | sed 's/"//g')
+   echo ${path}/${name}
+   ./jfrog rt dl gradle-release-local/${path}/${name} ./war/webservice.war --server-id=${SERVER_ID}  --flat=true
+}
+
 main () {
    #createUser
    getUserSecurity
@@ -124,7 +179,9 @@ main () {
    #uploadFileSpec "swampupfilespecUpload.json"
    #aqlsearch "aql/implfilter.aql"
    #latestDockerTag "docker-prod-local" "docker-app"
-   step1-create1-application 34
+   #step1-create1-application 34
+   #step2-create-docker-image-template 34
+   step3-create-docker-image-product 30
 }
 
 main
