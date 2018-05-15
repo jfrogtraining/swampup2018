@@ -14,7 +14,7 @@ ACCESS_TOKEN=""
 USER_APIKEY=""
 SERVER_ID="swampup2018"
 REMOTE_ART_ID="jfrogtraining"
-GRADLE_BUILD_NAME="gradle-example"
+GRADLE_BUILD_NAME="step1-create-application-war-file"
 
 # Exercise 4 - Create User and Repositories
 createUser () {
@@ -113,9 +113,9 @@ step1-create1-application () {
    ./jfrog rt gradle "clean artifactoryPublish -b ./build.gradle" gradle-example.config --build-name=$GRADLE_BUILD_NAME --build-number=$1
    # Environment variables are collected using the build-collect-env (bce) command.
    echo "Collecting environment varilable for buildinfo"
-   ./jfrog rt bce gradle-example $1
+   ./jfrog rt bce step1-create-application-war-file $1
    # publish the accumulated build information for a build to Artifactory
-   ./jfrog rt bp gradle-example $1 --server-id ${SERVER_ID}
+   ./jfrog rt bp step1-create-application-war-file $1 --server-id ${SERVER_ID}
    echo "Successfully build war application"
 }
 
@@ -194,6 +194,7 @@ deleteLatetDockerTag () {
     filespec="$(mktemp)"
     deleteLatestDockerFolder ${filespec} ${REPO} ${DOCKERIMAGE}
     echo -e "y" | ./jfrog rt del --spec=${filespec} --server-id=${SERVER_ID}
+    echo "Deleted ${REPO} ${DOCKERIMAGE}"
 }
 
 getLatestGradleWar () {
@@ -211,14 +212,14 @@ main () {
    getUserSecurity
    # createRepo "training-repo.yaml"
    loginArt
-   downloadDependenciesTools
+   # downloadDependenciesTools
    # uploadFileSpec "swampupfilespecUpload.json"
    # aqlsearch "aql/implfilter.aql"
    # latestDockerTag "docker-prod-local" "docker-app" 
    # step1-create1-application 10
-   step2-create-docker-image-template 34
-   step3-create-docker-image-product 34  
-   # deleteLatetDockerTag "docker-prod-local" "docker-app"   
+   # step2-create-docker-image-template 34
+   # step3-create-docker-image-product 34  
+   deleteLatetDockerTag "docker-stage-local" "docker-app"   
 }
 
 main

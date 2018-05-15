@@ -162,7 +162,7 @@ step3-create-docker-image-product () {
 
 getLatestGradleWar () {
    REPO=$1
-   aqlString='items.find ({"repo":{"$eq":"gradle-release-local"},"name":{"$match":"webservice-*.war"},"@build.name":"gradle-example"}).include("created","path","name").sort({"$desc" : ["created"]}).limit(1)'
+   aqlString='items.find ({"repo":{"$eq":"gradle-release-local"},"name":{"$match":"webservice-*.war"},"@build.name":"step1-create-application-war-file"}).include("created","path","name").sort({"$desc" : ["created"]}).limit(1)'
    local response=($(curl -s -u"${USER}":"${USER_APIKEY}" -H 'Content-Type: text/plain' -X POST "${ART_URL}"/api/search/aql -d "${aqlString}"))
    path=$(echo ${response[@]} | jq '.results[0].path' | sed 's/"//g')
    name=$(echo ${response[@]} | jq '.results[0].name' | sed 's/"//g')
