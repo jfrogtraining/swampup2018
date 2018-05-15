@@ -1,4 +1,4 @@
-Objective
+# Objective
 Artifactory 5.x sharding cluster setup
 Steps
 Login to Artifactory cluster (ssh admin@$ip)
