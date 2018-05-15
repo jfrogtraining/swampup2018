@@ -77,6 +77,9 @@ curl -ufrog_admin:jfrog -X POST http://jfrog.local:8081/artifactory/api/security
 #save it as a local variable
 set ADMIN_KEY=<apiKey>
 
+#Give deploy permission to swampdev group for generic-local repo
+curl -H "X-Jfrog-Art-API:%ADMIN_KEY%" -X PUT http://jfrog.local:8094/artifactory/api/security/permissions/swampdev -H "content-type: application/vnd.org.jfrog.artifactory.security.PermissionTarget+json" -T %SCRIPT_DIR%/permission-target.json
+
 
 ################################################
 #Establish a circle of trust
@@ -118,14 +121,14 @@ curl -H "Authorization: Bearer %token%" -T ./token.json http://jfrog.local:8095/
 #Previous command should failed as we do not have swampdev group and permission on this instance
 #Create swampdev group on standalone instances (connect to LDAP and import group or run the following)
 
-curl -uadmin:%ADMIN_PASSWORD% -X PUT http://jfrog.local:8094/artifactory/api/security/groups/sawmpdev -H "content-type: application/vnd.org.jfrog.artifactory.security.Group+json" -T %SCRIPT_DIR%/group.json
+curl -uadmin:%ADMIN_PASSWORD% -X PUT http://jfrog.local:8094/artifactory/api/security/groups/swampdev -H "content-type: application/vnd.org.jfrog.artifactory.security.Group+json" -T %SCRIPT_DIR%/group.json
 
 curl -uadmin:%ADMIN_PASSWORD% -X PUT http://jfrog.local:8095/artifactory/api/security/groups/swampdev -H "content-type: application/vnd.org.jfrog.artifactory.security.Group+json" -T %SCRIPT_DIR%/group.json
 
 #Give deploy permission to swampdev group for generic-local repo
 curl -uadmin:%ADMIN_PASSWORD% -X PUT http://jfrog.local:8094/artifactory/api/security/permissions/swampdev -H "content-type: application/vnd.org.jfrog.artifactory.security.PermissionTarget+json" -T %SCRIPT_DIR%/permission-target.json
 
-curl -uadmin:%ADMIN_PASSWORD% -X PUT http:// jfrog.local :8095/artifactory/api/security/permissions/swampdev -H "content-type: application/vnd.org.jfrog.artifactory.security.PermissionTarget+json" -T %SCRIPT_DIR%/permission-target.json
+curl -uadmin:%ADMIN_PASSWORD% -X PUT http://jfrog.local:8095/artifactory/api/security/permissions/swampdev -H "content-type: application/vnd.org.jfrog.artifactory.security.PermissionTarget+json" -T %SCRIPT_DIR%/permission-target.json
 
 #test the token again
 curl -H "Authorization: Bearer %token%" -T ./token.json http://jfrog.local:8095/artifactory/generic-local/token.json
