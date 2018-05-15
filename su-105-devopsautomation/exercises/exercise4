@@ -23,7 +23,7 @@ createUser () {
          "password":"'"${ART_PASSWORD}"'",
          "email":"null@jfrog.com",
          "admin":true,
-         "groups":["readers","admin-group"]
+         "groups":["readers"]
        }'
 }
 
