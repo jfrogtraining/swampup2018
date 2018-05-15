@@ -20,8 +20,8 @@ import java.util.Random
 node {
     def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
     Random random = new Random()
-
-    def SIZE = (random.nextInt(10) + 1).toString() + "M"
+    def size = (!SIZE.allWhitespace) ? SIZE : (random.nextInt(10) + 1).toString() + "M"
+    println "Size used is ${size}"
     def PNUM = random.nextInt(5) + 1
     def NUMOFTAGS = 1
     def DNAME = "sample_docker"
@@ -37,7 +37,8 @@ node {
     def namespace_domain = "${NAMESPACEDOMAIN}"
     def ARTIURL = "http://${namespace_domain}/artifactory"
     def TESTING = "swampup"
-    def INUM = random.nextInt(1) + 1
+    def inum = (!INUM.allWhitespace) ? INUM : random.nextInt(1) + 1
+    println "INUM value used is ${inum}"
     def LNUM = random.nextInt(10) + 1
     def TAG = "latest"
     def DOCKER_REGISTRY = "${namespace_domain}:5001"
@@ -60,7 +61,7 @@ node {
            sh 'docker system prune -f'
            sh "docker login -u ${repoUser} -p ${repoPwd} ${dockerURL}"
 		   sh "docker pull ${dockerURL}/qa/data/docker-generator:1.2"
-		   sh "docker run --privileged --name docker-generator-$BUILD_NUMBER -v /etc/hosts:/etc/hosts -e DOCKERHOSTMAP=${DOCKERHOSTMAP} -e NUMOFTAGS=${NUMOFTAGS} -e DOCKER_REGISTRY=${DOCKER_REGISTRY} -e DNAME=${DNAME} -e baseImage=${baseImage} -e LNUM=${LNUM} -e MODE=bp -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e NAMESPACE=${NAMESPACE} -e SIZE=${SIZE} -e INUM=${INUM} -e FNUM=${FNUM} -e TAG=${TAGPREFIX} ${dockerURL}/qa/data/docker-generator:1.2"
+		   sh "docker run --privileged --name docker-generator-$BUILD_NUMBER -v /etc/hosts:/etc/hosts -e DOCKERHOSTMAP=${DOCKERHOSTMAP} -e NUMOFTAGS=${NUMOFTAGS} -e DOCKER_REGISTRY=${DOCKER_REGISTRY} -e DNAME=${DNAME} -e baseImage=${baseImage} -e LNUM=${LNUM} -e MODE=bp -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e NAMESPACE=${NAMESPACE} -e SIZE=${size} -e INUM=${inum} -e FNUM=${FNUM} -e TAG=${TAGPREFIX} ${dockerURL}/qa/data/docker-generator:1.2"
 		   sh 'docker logs -f docker-generator-$BUILD_NUMBER'
 		}
 	    rtServer.publishBuildInfo buildInfo
@@ -68,7 +69,7 @@ node {
 
 	stage ('Check Last File') {
 		def server = Artifactory.newServer url: ARTIURL, username: ARTIUSER, password: PASSWORD
-		def path = get_path(NAMESPACE, INUM)
+		def path = get_path(NAMESPACE, inum)
 		def fileName = get_file()
 
 		def downloadSpec = """{
@@ -108,6 +109,6 @@ def get_file () {
 	return ("manifest.$ext")
 }
 
-def get_path (NAMESPACE, INUM) {
-	return ("${NAMESPACE}/sample_docker${INUM}-${BUILD_NUMBER}/1.0")
+def get_path (NAMESPACE, inum) {
+	return ("${NAMESPACE}/sample_docker${inum}-${BUILD_NUMBER}/1.0")
 }

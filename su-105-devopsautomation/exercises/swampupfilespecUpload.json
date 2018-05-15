@@ -1,13 +1,13 @@
 {
   "files": [
     {
-      "pattern": "java/",
+      "pattern": "jdk/",
       "target": "tomcat-local/",
       "props": "security=approved;signoff=stanleyf",
       "flat": "false"
     },
     {
-      "pattern": "org/",
+      "pattern": "tomcat/",
       "target": "tomcat-local/",
       "props": "security=pending;signoff=stanleyf",
       "flat" : "false"

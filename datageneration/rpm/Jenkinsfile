@@ -20,13 +20,13 @@ import java.util.Random
 //    XRAYURL - xray url
 
 node  {
-	def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
-	Random random = new Random()
-
-	 def SIZE = (random.nextInt(10) + 1).toString() + "M"
-	 def RNUM = random.nextInt(2)
-     def PNUM = RNUM + 1
-     def NNUM = RNUM + 2
+	 def ignoreAlertsCheck = (XRAY_SCAN == "NO") ? true : false
+	 Random random = new Random()
+     def size = (!SIZE.allWhitespace) ? SIZE : (random.nextInt(10) + 1).toString() + "M"
+     println "Size used is ${size}"
+     def pnum = (!PNUM.allWhitespace) ? PNUM : random.nextInt(2) + 1
+     println "PNUM value is ${pnum}"
+     def NNUM = pnum + 1
      def DEST = ""
      def FNUM = "1"
      def COMPRESS = ""
@@ -56,7 +56,7 @@ node  {
 		withCredentials([usernamePassword(credentialsId: CREDENTIALS, passwordVariable: 'repoPwd', usernameVariable: 'repoUser')]) {
 		   sh "docker login -u ${repoUser} -p ${repoPwd} ${dockerURL}"
 		   sh "docker pull ${dockerURL}/qa/data/rpm-generator:1.2"
-		   sh "docker run --name rpm-generator-$BUILD_NUMBER -v /etc/hosts:/etc/hosts -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${SIZE} -e PNUM=${PNUM} -e FNUM=${FNUM} ${dockerURL}/qa/data/rpm-generator:1.2"
+		   sh "docker run --name rpm-generator-$BUILD_NUMBER -v /etc/hosts:/etc/hosts -e COMMAND=gd -e BUILD_NUMBER=$BUILD_NUMBER -e ARTIURL=${ARTIURL} -e ARTIUSER=${ARTIUSER} -e PASSWORD=${PASSWORD} -e REPO=${REPO} -e DPATH=${DPATH} -e SIZE=${size} -e PNUM=${pnum} -e FNUM=${FNUM} ${dockerURL}/qa/data/rpm-generator:1.2"
 		   sh 'docker logs -f rpm-generator-$BUILD_NUMBER'
 		}
 		rtServer.publishBuildInfo buildInfo
@@ -66,8 +66,8 @@ node  {
 		def server = Artifactory.newServer url: ARTIURL, username: ARTIUSER, password: PASSWORD
 		def path = "${BUILD_NUMBER}/os/x86_64/RPMS"
 		def ext = "rpm"
-	    def nextNum = NNUM
-		def fileName = "sample_rpm${PNUM}_${BUILD_NUMBER}-${PNUM}-${nextNum}.x86_64.$ext"
+	        def nextNum = pnum.toInteger() + 1
+		def fileName = "sample_rpm${pnum}_${BUILD_NUMBER}-${pnum}-${nextNum}.x86_64.$ext"
 
 		def downloadSpec = """{
 			"files": [

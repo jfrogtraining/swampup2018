@@ -1,0 +1,10 @@
+Objective
+Horizontal Scaling (Adding more nodes to the cluster)
+High Level Steps
+Login to Environment (ssh admin@$ip)
+Docker ps
+Uncomment artifactory-node3  in /root/docker-compose.yml (vim /root/docker-compose.yml)
+Run (docker-compose -f /root/docker-compose.yml up -d)
+Logs (docker-compose -f /root/docker-compose.yml logs -f)
+
+

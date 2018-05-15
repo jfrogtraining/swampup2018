@@ -1,0 +1,35 @@
+#!/usr/bin/env groovy
+import groovy.json.JsonSlurper
+import groovy.json.JsonBuilder
+
+node {
+
+    def NAMESPACEDOMAIN = "jfrog.local"     //domain name to use: jfrog.local
+    def SERVER_URL = "http://${NAMESPACEDOMAIN}/artifactory"
+    def latestVersionName 
+    stage('Install helm') {
+        /* This installs helm client */
+        withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
+          sh "curl -u ${env.USERNAME}:${env.PASSWORD} -O ${SERVER_URL}/generic-local/helm"
+          sh "chmod 777 ./helm"
+        }
+
+    }
+
+    stage('Configure helm & add Artifactory repo') {
+        /* Configure helm client to point to k8s cluster */
+         sh 'helm init'
+         withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
+           sh "helm version"
+           sh "helm repo add helm ${SERVER_URL}/helm "
+           sh "helm repo update"
+         }
+    }
+
+    stage('Deploy chart pulling from Artifactory') {
+        /* Finally, we'll deploy the image to k8s using helm chart. this will pickup the lastest chart */
+        
+        sh "./helm upgrade my-docker-app --install helm/docker-app-chart --set service.type=NodePort --set service.nodePort=30001 --set image.repository=jfrog.local:5001/docker-app"
+    }
+}
+                             

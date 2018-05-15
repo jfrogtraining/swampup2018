@@ -2,15 +2,10 @@
 import groovy.json.JsonSlurper
 
 node {
-    def WATCHNAME = env.JOB_NAME
-    def jobName = env.JOB_NAME
-    def domainName = jobName.matches("(.*)-au") ? "${env.NAMESPACE_AU_DOMAIN}":"${env.NAMESPACE_US_DOMAIN}"
-    def namespace_domain = "${NAMESPACEDOMAIN}" ? "${NAMESPACEDOMAIN}":"${domainName}"
-    println "Domain Used : " + namespace_domain
 
-    def server_url = "https://artifactory-${namespace_domain}/artifactory"
-    def image_tag = getLatestDockerImage(server_url)
+    def server_url = "http://${NAMESPACEDOMAIN}/artifactory"
     def repo = "helm-virtual"
+    def image_tag
     stage('Clone repository') {
         /* Let's make sure we have the repository cloned to our workspace */
         git url: 'https://github.com/jfrogtraining/kubernetes_example.git', branch: 'master'
@@ -20,6 +15,7 @@ node {
         /* Configure helm client to point to k8s cluster */
          withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
               sh "jfrog rt c beta --user ${USERNAME} --password ${PASSWORD} --url ${server_url} < /dev/null"
+              image_tag = getLatestDockerImage(server_url, "${USERNAME}", "${PASSWORD}")
          }
 
          updateChartFile ()
@@ -38,7 +34,7 @@ def updateChartFile () {
     sh 'sed -i "s/0.1.1/0.1.$BUILD_NUMBER/" ./docker-app-chart/Chart.yaml'
 }
 
-def getLatestDockerImage (server_url) {
+def getLatestDockerImage (server_url, user, password) {
 
    def aqlString = 'items.find ({ "repo":"docker-prod-local","type":"folder","$and":[{"path":{"$match":"docker-app*"}},{"path":{"$nmatch":"docker-app/latest"}}]}).include("path","created","name").sort({"$desc" : ["created"]}).limit(1)'
 
@@ -47,7 +43,7 @@ def getLatestDockerImage (server_url) {
 
    aqlFile << aqlString
 
-   def getLatestChart = "curl -uadmin:password -X POST " + server_url + "/api/search/aql -T " + aqlFile.getAbsolutePath()
+   def getLatestChart = "curl -u${user}:${password} -X POST " + server_url + "/api/search/aql -T " + aqlFile.getAbsolutePath()
 
    try {
          def helmchartinfo = getLatestChart.execute().text
@@ -59,3 +55,4 @@ def getLatestDockerImage (server_url) {
          throw e
       }
 }
+
