@@ -1,0 +1,48 @@
+body {
+  font-family: "Open Sans",sans-serif;
+  color: #6E6E6E;
+  /*font-size: 18px;*/
+  font-weight: 300;
+}
+
+.navbar-default {
+  background: #42A046 none repeat scroll 0% 0%;
+  padding: 1em;
+  margin-bottom: 1em;
+}
+
+.navbar-default h2 {
+  /*font-size: 20px;*/
+  color: white;
+}
+
+.frogs {
+  font-size: larger;
+}
+
+.version {
+  margin-top:1em;
+  margin-right: 1em;
+  text-align: right;
+}
+
+.caroussel {
+  height: 600px;
+}
+
+.carousel-inner {
+  background-color: #e1e1e4;
+  height: 600px;
+}
+
+.carousel-caption {
+  bottom: inherit;
+}
+
+.carousel-caption h4 {
+  font-size: 3em;
+}
+
+.carousel-caption p {
+  font-size: 2em;
+}

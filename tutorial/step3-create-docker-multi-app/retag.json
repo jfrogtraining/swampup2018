@@ -1,0 +1,7 @@
+{
+  "targetRepo" : "TARGETREPO",
+  "dockerRepository" : "docker-multi-app",
+  "tag" : "@",
+  "targetTag" : "latest",
+  "copy": true
+}
