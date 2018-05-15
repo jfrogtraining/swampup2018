@@ -1,0 +1,15 @@
+Objective
+Artifactory 5.x sharding cluster setup
+Steps
+Login to Artifactory cluster (ssh admin@$ip)
+Perform as root (sudo su -) (Because all the services has been installed with sudo)
+cd  /jfrog/data/artifactory/node1/etc and update binarystore.xml for “sharding-cluster” config. 
+cp binarystore.xml binarystore.xml.old
+cp binarystore.xml.new to binarystore.xml
+cp –p binarystore.xml /jfrog/data/artifactory/node2/etc/
+Perform CD and goto /root
+Perform “docker-compose -f docker-compose.yml restart”
+Upload a file and verify the files on both node under 
+(/jfrog/data/artifactory/ha/filestore & /jfrog/data/artifactory/ha/filestore2)
+Run otimize API (curl -uadmin:{orbitera_password}  http://IP:PORT/artifactory/api/system/storage/optimize -X POST -v )
+Run garbage collector (Artifactory->Admin->Maintenance->Garbage Collector)
