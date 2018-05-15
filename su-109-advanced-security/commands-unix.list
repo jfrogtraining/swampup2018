@@ -41,10 +41,16 @@ curl -uadmin:$ADMIN_PASSWORD -X PUT http://jfrog.local/artifactory/api/security/
 ################################################
 ssh admin@jfrog.local
 
-sudo docker pull jfrogtraining-docker-dev.jfrog.io/soleng_openldap:1.1
+#Login to Artifactory docekr registry provisioned for the training
+sudo docker login jfrogtraining-docker.jfrog.io -u security-training -p password
 
-sudo docker run -itd --name openldap -p 389:389 --network root_default jfrogtraining-docker-dev.jfrog.io/soleng_openldap:1.1
+#Pull openLDAP image from Artifactory
+sudo docker pull jfrogtraining-docker.jfrog.io/soleng_openldap
 
+#run the openLDAP container
+sudo docker run -itd --name openldap -p 389:389 --network root_default jfrogtraining-docker.jfrog.io/soleng_openldap
+
+#Populate the openLDAP with data
 sudo docker exec openldap /init.sh
 
 ################################################
@@ -69,10 +75,10 @@ export ADMIN_KEY=<apiKey>
 #Establish a circle of trust
 ################################################
 #check standalone 1 trusted store
-docker exec -it  artifactory-standalone-1 ls -l “/var/opt/jfrog/artifactory/access/etc/keys/trusted/”
+docker exec -it  artifactory-standalone-1 ls -l "/var/opt/jfrog/artifactory/access/etc/keys/trusted/"
 
 #check standalone 2 trusted store
-docker exec -it  artifactory-standalone-2 ls -l “/var/opt/jfrog/artifactory/access/etc/keys/trusted/”
+docker exec -it  artifactory-standalone-2 ls -l "/var/opt/jfrog/artifactory/access/etc/keys/trusted/"
 
 #get artifactory instances service_id
 export id_main=$(curl -H "X-Jfrog-Art-API:$ADMIN_KEY"  http://jfrog.local/artifactory/api/system/service_id)
@@ -82,7 +88,7 @@ export id_s1=$(curl -uadmin:$ADMIN_PASSWORD  http://jfrog.local:8094/artifactory
 export id_s2=$(curl -uadmin:$ADMIN_PASSWORD  http://jfrog.local:8095/artifactory/api/system/service_id)
 
 #generate a refreshable token shared between the three instances
-curl -H "X-Jfrog-Art-API:$ADMIN_KEY" -X POST "http://jfrog.local/artifactory/api/security/token" -d "username=kermit" -d "scope=member-of-groups:swampdev" -d "audience=$id_main $id_s2 $id_s3" -d "refreshable=true"
+curl -H "X-Jfrog-Art-API:$ADMIN_KEY" -X POST "http://jfrog.local/artifactory/api/security/token" -d "username=kermit" -d "scope=member-of-groups:swampdev" -d "audience=$id_main $id_s1 $id_s2" -d "refreshable=true"
 
 #Result example
 {
@@ -97,9 +103,25 @@ export token=<TokenGenerated>
 export refresh=<RefreshToken>
 
 #Test your token
-curl -ukermit:$token -T ./token.json http://jfrog.local/artifactory/example-repo-local/token.json
+curl -ukermit:$token -T ./token.json http://jfrog.local/artifactory/generic-local/token.json
 
 curl -H"Authorization: Bearer $token" -T ./token.json http://jfrog.local:8095/artifactory/generic-local/token.json
+
+#Previous command should failed as we do not have swampdev group and permission on this instance
+#Create swampdev group on standalone instances (connect to LDAP and import group or run the following)
+
+curl -uadmin:$ADMIN_PASSWORD -X PUT http://jfrog.local:8094/artifactory/api/security/groups/sawmpdev -H "content-type: application/vnd.org.jfrog.artifactory.security.Group+json" -T $SCRIPT_DIR/group.json
+
+curl -uadmin:$ADMIN_PASSWORD -X PUT http://jfrog.local:8095/artifactory/api/security/groups/swampdev -H "content-type: application/vnd.org.jfrog.artifactory.security.Group+json" -T $SCRIPT_DIR/group.json
+
+#Give deploy permission to swampdev group for generic-local repo
+curl -uadmin:$ADMIN_PASSWORD -X PUT http://jfrog.local:8094/artifactory/api/security/permissions/swampdev -H "content-type: application/vnd.org.jfrog.artifactory.security.PermissionTarget+json" -T $SCRIPT_DIR/permission-target.json
+
+curl -uadmin:$ADMIN_PASSWORD -X PUT http:// jfrog.local :8095/artifactory/api/security/permissions/swampdev -H "content-type: application/vnd.org.jfrog.artifactory.security.PermissionTarget+json" -T $SCRIPT_DIR/permission-target.json
+
+#test the token again
+curl -H"Authorization: Bearer $token" -T ./token.json http://jfrog.local:8095/artifactory/generic-local/token.json
+
 
 #refresh token
 curl -XPOST "http://jfrog.local/artifactory/api/security/token" -d "grant_type=refresh_token" -d "refresh_token=$refresh" -d "access_token=$token" 
