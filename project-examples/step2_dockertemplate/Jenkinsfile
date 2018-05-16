@@ -37,7 +37,7 @@ node {
                            "flat":"true"
                           },
                           {
-                           "pattern": "tomcat-local/org/apache/apache-tomcat/apache-tomcat-8.0.32.tar.gz",
+                           "pattern": "tomcat-local/org/apache/apache-tomcat/apache-tomcat-8.0.52.tar.gz",
                            "target": "tomcat/apache-tomcat-8.tar.gz",
                            "flat":"true"
                           }
