@@ -12,4 +12,5 @@ docker pull jfrog.local:5001/docker-framework-x1:1
 #EDIT TOKEN.json with correct user/password
 curl -uadmin:password jfrog.local:8000/api/v1/auth/token -X POST -H "Content-Type:application/json" -T token.json -vv
 curl "http://jfrog.local:8000/xray/api/v1/projects/myproj/occurrences?filter=deb%3A%2F%2Fubuntu%3Axenial%3Aglibc%3A2.23-0ubuntu10" -vvv
+echo -n 'deb://ubuntu:xenial:glibc:2.23-0ubuntu10' | base64
 curl -uadmin:password 'http://35.193.110.50:8000/api/v1/v1alpha1/projects/xrayScanner/occurrences?filter=ZGViOi8vdWJ1bnR1OnhlbmlhbDpnbGliYzoyLjIzLTB1YnVudHUxMA==' -H 'Content-Type: application/json'
