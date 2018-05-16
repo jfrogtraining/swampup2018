@@ -64,7 +64,7 @@ node {
             updateBaseDockerFile(artdocker_registry)
             withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: CREDENTIALS, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']]) {
                     def rtDocker = Artifactory.docker server: rtServer
-                    tagName = "${artdocker_registry}/docker-framework:${env.BUILD_NUMBER}"
+                    tagName = "${artdocker_registry}/docker-framework:${env.BUILD_NUMBER}-x"
                     docker.withRegistry ("https://${artdocker_registry}", CREDENTIALS) {
                          sh "docker login -u ${USERNAME} -p ${PASSWORD} https://${artdocker_registry}"
                          docker.build(tagName)
