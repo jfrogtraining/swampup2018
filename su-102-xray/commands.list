@@ -4,3 +4,8 @@
 #Script Path: project-examples/step2_dockertemplate/Jenkinsfile
 
 #EXERCISE 5:
+#Create User in Xray
+#EDIT TOKEN.json with correct user/password
+curl -uadmin:password jfrog.local:8000/api/v1/auth/token -X POST -H "Content-Type:application/json" -T token.json -vv
+curl "http://jfrog.local:8000/xray/api/v1/projects/myproj/occurrences?filter=deb%3A%2F%2Fubuntu%3Axenial%3Aglibc%3A2.23-0ubuntu10" -vvv
+curl -
